@@ -32,53 +32,53 @@ import           Criterion
 benchmark :: IOManager -> [(Text, Text)] -> Benchmark
 benchmark iom knownMigrations =
     bgroup "bench"
-      [ bgroup "empty blocks"
-          [ bnch 3 "empty blocks 10" $ emptyBlocks 10
-          , bnch 3 "empty blocks 10" $ emptyBlocks 50
-          , bnch 3 "empty blocks 10" $ emptyBlocks 100
-          , longBnch "empty blocks 10" $ emptyBlocks 500
-          ]
-      , bgroup "register addresses 1000 per block"
-          [ bnch 3 "1 block" $ registerAddressess 1
-          , bnch 3 "10 block" $ registerAddressess 10
-          , bnch 3 "100 block" $ registerAddressess 100
-          , bnch 3 "200 block" $ registerAddressess 200
-          ]
-      , bgroup "create UTxO. 200 per block"
-          [ bnch 3 "1 block" $ createUTXO 1
-          , bnch 3 "10 block" $ createUTXO 10
-          , longBnch "100 block" $ createUTXO 100
-          , longBnch "100 block" $ createUTXO 1000
-          ]
-      , bgroup "create UTxO. 1000 per block"
-          [ bnch 3 "1 block" $ createUTXO' 1
-          , bnch 3 "10 block" $ createUTXO' 10
-          , longBnch "100 block" $ createUTXO' 100
-          , longBnch "1000 block" $ createUTXO' 1000
-          ]
-      , bgroup "create multiasssets."
+--      [ bgroup "empty blocks"
+--          [ bnch 3 "empty blocks 10" $ emptyBlocks 10
+--          , bnch 3 "empty blocks 10" $ emptyBlocks 50
+--          , bnch 3 "empty blocks 10" $ emptyBlocks 100
+--          , longBnch "empty blocks 10" $ emptyBlocks 500
+--          ]
+--      , bgroup "register addresses 1000 per block"
+--          [ bnch 3 "1 block" $ registerAddressess 1
+--          , bnch 3 "10 block" $ registerAddressess 10
+--          , bnch 3 "100 block" $ registerAddressess 100
+--          , bnch 3 "200 block" $ registerAddressess 200
+--          ]
+--      , bgroup "create UTxO. 200 per block"
+--          [ bnch 3 "1 block" $ createUTXO 1
+--          , bnch 3 "10 block" $ createUTXO 10
+--          , longBnch "100 block" $ createUTXO 100
+--          , longBnch "100 block" $ createUTXO 1000
+--          ]
+--      , bgroup "create UTxO. 1000 per block"
+--          [ bnch 3 "1 block" $ createUTXO' 1
+--          , bnch 3 "10 block" $ createUTXO' 10
+--          , longBnch "100 block" $ createUTXO' 100
+--          , longBnch "1000 block" $ createUTXO' 1000
+--          ]
+      [ bgroup "create multiasssets."
           [ bnch 3 "1 block" $ createMaTxOut 1
           , bnch 3 "10 block" $ createMaTxOut 10
           , longBnch "100 block" $ createMaTxOut 100
           ]
-      , bgroup "delegate and send funds"
-          [ bnch 3 "3 block" $ delegateAndSend 1
-          , bnch 3 "30 block" $ delegateAndSend 10
-          , longBnch "300 block" $ delegateAndSend 100
-          , longBnch "1200 block" $ delegateAndSend 400
-          ]
-      , bgroup "rollback multiassets"
-          [ bnch 3 "1 block" $ rollbackMaTxOut 1
-          , bnch 3 "10 block" $ rollbackMaTxOut 10
-          , longBnch "100 block" $ rollbackMaTxOut 100
-          , longBnch "500 block" $ rollbackMaTxOut 500
-          ]
-      , bgroup "delegate and send funds"
-          [ bnch 3 "3 block" $ delegateAndSend 1
-          , bnch 3 "30 block" $ delegateAndSend 10
-          , longBnch "300 block" $ createMaTxOut 100
-          , longBnch "1200 block" $ delegateAndSend 400
-          ]
+--      , bgroup "delegate and send funds"
+--          [ bnch 3 "3 block" $ delegateAndSend 1
+--          , bnch 3 "30 block" $ delegateAndSend 10
+--          , longBnch "300 block" $ delegateAndSend 100
+--          , longBnch "1200 block" $ delegateAndSend 400
+--          ]
+  --    , bgroup "rollback multiassets"
+--          [ bnch 3 "1 block" $ rollbackMaTxOut 1
+      --    , bnch 3 "10 block" $ rollbackMaTxOut 10
+      --    , longBnch "100 block" $ rollbackMaTxOut 100
+      --    , longBnch "500 block" $ rollbackMaTxOut 500
+--          ]
+--      , bgroup "delegate and send funds"
+--          [ bnch 3 "3 block" $ delegateAndSend 1
+--          , bnch 3 "30 block" $ delegateAndSend 10
+--          , longBnch "300 block" $ createMaTxOut 100
+--          , longBnch "1200 block" $ delegateAndSend 400
+--          ]
       ]
   where
     _bnch' :: String -> (IOManager -> [(Text, Text)] -> Benchmarkable) -> Benchmark
