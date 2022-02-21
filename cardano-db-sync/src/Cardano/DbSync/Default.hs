@@ -79,7 +79,7 @@ insertDefaultBlock env blocks =
       let firstBlockOfEpoch = hasEpochStartEvent (lssEvents lStateSnap)
       case cblk of
         BlockByron blk ->
-          newExceptT $ insertByronBlock tracer firstBlockOfEpoch blk details
+          newExceptT $ insertByronBlock env firstBlockOfEpoch blk details
         BlockShelley blk ->
           newExceptT $ insertShelleyBlock env firstBlockOfEpoch (Generic.fromShelleyBlock blk) lStateSnap details
         BlockAllegra blk ->

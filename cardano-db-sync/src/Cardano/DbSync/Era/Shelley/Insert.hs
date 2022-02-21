@@ -86,11 +86,11 @@ insertShelleyBlock  env firstBlockOfEpoch blk lStateSnap details = do
   runExceptT $ do
     pbid <- case Generic.blkPreviousHash blk of
       Nothing -> liftLookupFail (renderInsertName (Generic.blkEra blk)) DB.queryGenesis -- this is for networks that fork from Byron on epoch 0.
-      Just pHash -> liftLookupFail (renderInsertName (Generic.blkEra blk)) $ DB.queryBlockId pHash
+      Just pHash -> queryPrevBlockWithCache (renderInsertName (Generic.blkEra blk)) cache pHash
     mPhid <- lift $ queryPoolHashId (Generic.blkCreatorPoolHash blk)
 
     slid <- lift . DB.insertSlotLeader $ Generic.mkSlotLeader (Generic.blkSlotLeader blk) mPhid
-    blkId <- lift . DB.insertBlock $
+    blkId <- lift . insertBlockAndCache cache $
                   DB.Block
                     { DB.blockHash = Generic.blkHash blk
                     , DB.blockEpochNo = Just $ unEpochNo (sdEpochNo details)
