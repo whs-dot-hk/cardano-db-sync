@@ -17,23 +17,25 @@ import           Data.IORef (IORef, modifyIORef, newIORef, readIORef, writeIORef
 import           Cardano.Ledger.Mary.Value (AssetName (..))
 
 import qualified Cardano.Db as DB
+import           Cardano.DbSync.Era.Shelley.Query
 import           Cardano.DbSync.Era.Util
 import           Cardano.DbSync.Error
 
 import           Database.Persist.Postgresql (SqlBackend)
 
 data Cache = Cache
-  { maIndex :: IORef (Map (ByteString, AssetName) DB.MultiAssetId)
+  { multiAssets :: IORef (Map (ByteString, AssetName) DB.MultiAssetId)
   , prevBlock :: IORef (Maybe (DB.BlockId, ByteString))
+  , pools :: IORef (Map ByteString DB.PoolHash)
   }
 
 
 newEmptyCache :: MonadIO m => m Cache
-newEmptyCache = liftIO $ Cache <$> newIORef Map.empty <*> newIORef Nothing
+newEmptyCache = liftIO $ Cache <$> newIORef Map.empty <*> newIORef Nothing <*> newIORef Map.empty
 
 queryMAWithCache :: MonadIO m => Cache -> ByteString -> AssetName
                  -> ReaderT SqlBackend m (Maybe DB.MultiAssetId)
-queryMAWithCache Cache {maIndex = ref} policyId a@(AssetName aName) = do
+queryMAWithCache Cache {multiAssets = ref} policyId a@(AssetName aName) = do
     mp <- liftIO $ readIORef ref 
     case Map.lookup (policyId, a) mp of
       Just maId -> pure $ Just maId
@@ -43,7 +45,7 @@ queryMAWithCache Cache {maIndex = ref} policyId a@(AssetName aName) = do
           Nothing -> pure Nothing
           Just mId -> do
             liftIO $ modifyIORef ref $ Map.insert (policyId, a) mId
-            pure maId 
+            pure maId
 
 queryPrevBlockWithCache :: MonadIO m => Text -> Cache -> ByteString
                         -> ExceptT SyncNodeError (ReaderT SqlBackend m) DB.BlockId
@@ -58,3 +60,18 @@ insertBlockAndCache Cache {prevBlock = ref} block = do
     bid <- DB.insertBlock block
     liftIO $ writeIORef ref $ Just (bid, DB.blockHash block)
     pure bid
+
+queryPoolIdWithCache :: MonadIO m => Cache -> ByteString -> ReaderT SqlBackend m (Maybe DB.PoolHashId)
+queryPoolIdWithCache Cache {pools = ref} hsh = do
+    mp <- liftIO $ readIORef ref
+    case Map.lookup hsh mp of
+      Just phId -> pure $ Just phId
+      Nothing -> do
+        mPhId <- queryPoolHashId hsh
+        case mPhId of
+          Nothing -> pure Nothing
+          Just phId -> do
+            liftIO $ modifyIORef ref $ Map.insert hsh phId
+            pure phId
+
+
