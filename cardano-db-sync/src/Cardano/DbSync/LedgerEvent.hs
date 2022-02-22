@@ -159,7 +159,7 @@ pattern LERewards
     -> AuxLedgerEvent (LedgerState (ShelleyBlock ledgerera))
 pattern LERewards e m <-
   ShelleyLedgerEventTICK
-    (NewEpochEvent (RewardEvent e m))
+    (NewEpochEvent (TotalRewardEvent e m))
 
 pattern LEMirTransfer
     :: ( Crypto ledgerera ~ StandardCrypto

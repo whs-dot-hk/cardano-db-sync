@@ -10,7 +10,7 @@ import           Cardano.Prelude hiding (Maybe (..), fromMaybe)
 import           Cardano.Slotting.Slot (EpochNo (..))
 
 import qualified Cardano.Ledger.BaseTypes as Ledger
-import qualified Cardano.Ledger.Shelley.API.Protocol as Shelley
+import qualified Cardano.Protocol.TPraos.API as Shelley
 import qualified Cardano.Ledger.Shelley.API.Wallet as Shelley
 import qualified Cardano.Protocol.TPraos.Rules.Tickn as Shelley
 

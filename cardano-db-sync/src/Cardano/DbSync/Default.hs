@@ -11,7 +11,7 @@ module Cardano.DbSync.Default
 
 import           Cardano.Prelude
 
-import           Cardano.BM.Trace (Trace, logDebug, logInfo)
+import           Cardano.BM.Trace (Trace, logDebug, logInfo, logWarning)
 
 import qualified Cardano.Db as DB
 
@@ -59,7 +59,8 @@ import           Ouroboros.Network.Block (blockNo)
 insertDefaultBlock
     :: SyncEnv -> [CardanoBlock]
     -> IO (Either SyncNodeError ())
-insertDefaultBlock env blocks =
+insertDefaultBlock env blocks = do
+    logWarning tracer $ "Transaction with blocks " <> textShow (length blocks)
     DB.runDbIohkLogging backend tracer .
       runExceptT $ do
         traverse_ insertDetails blocks
@@ -159,6 +160,7 @@ handleLedgerEvents tracer lenv point =
             , show (unEpochNo $ Generic.sdistEpochNo sdist), " ", renderPoint point
             ]
           postEpochStake lenv sdist point
+          liftIO . logInfo tracer $ mconcat ["posted"]
         LedgerRewardDist rwd ->
           lift $ stashPoolRewards tracer lenv rwd
         LedgerMirDist md ->
