@@ -21,7 +21,7 @@ import qualified Cardano.Ledger.Alonzo.TxBody as Alonzo
 import qualified Cardano.Ledger.Core as Ledger
 import           Cardano.Ledger.Era (Crypto)
 import           Cardano.Ledger.Shelley.API (Addr (..), Coin (..))
-import           Cardano.Ledger.Shelley.CompactAddr (CompactAddr, compactAddr)
+import           Cardano.Ledger.CompactAddress (CompactAddr, compactAddr)
 import qualified Cardano.Ledger.Shelley.LedgerState as Shelley
 import qualified Cardano.Ledger.Shelley.TxBody as Shelley
 import qualified Cardano.Ledger.Shelley.UTxO as Shelley
@@ -30,6 +30,7 @@ import           Cardano.Ledger.Compactible
 import           Cardano.Ledger.Val
 import           Cardano.Prelude
 
+import qualified Data.Compact.SplitMap as SplitMap
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 
@@ -70,7 +71,7 @@ getShelleyBalance
     => Text -> Shelley.UTxO era -> Either Text Word64
 getShelleyBalance addrText utxo = do
     caddr <- covertToCompactAddress addrText
-    Right . fromIntegral . sum $ unCoin <$> mapMaybe (compactTxOutValue caddr) (Map.elems $ Shelley.unUTxO utxo)
+    Right . fromIntegral . sum $ unCoin <$> mapMaybe (compactTxOutValue caddr) (SplitMap.elems $ Shelley.unUTxO utxo)
   where
     compactTxOutValue :: CompactAddr (Crypto era) -> Ledger.TxOut era -> Maybe Coin
     compactTxOutValue caddr (Shelley.TxOutCompact scaddr v) =
@@ -81,7 +82,7 @@ getShelleyBalance addrText utxo = do
 getAlonzoBalance :: Text -> Shelley.UTxO (AlonzoEra StandardCrypto) -> Either Text Word64
 getAlonzoBalance addrText utxo = do
     caddr <- covertToCompactAddress addrText
-    Right . fromIntegral . sum $ unCoin <$> mapMaybe (compactTxOutValue caddr) (Map.elems $ Shelley.unUTxO utxo)
+    Right . fromIntegral . sum $ unCoin <$> mapMaybe (compactTxOutValue caddr) (SplitMap.elems $ Shelley.unUTxO utxo)
   where
     compactTxOutValue
       :: CompactAddr (Crypto (AlonzoEra StandardCrypto)) -> Alonzo.TxOut (AlonzoEra StandardCrypto) -> Maybe Coin

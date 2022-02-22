@@ -21,6 +21,7 @@ import qualified Cardano.Db as DB
 import qualified Cardano.Crypto.Hash as Crypto
 
 import           Cardano.Ledger.Alonzo.Data
+import           Cardano.Ledger.BaseTypes
 import           Cardano.Ledger.Coin
 import           Cardano.Ledger.Credential
 import           Cardano.Ledger.Keys
@@ -209,7 +210,8 @@ simpleRollback = do
 bigChain :: IOManager -> [(Text, Text)] -> Assertion
 bigChain =
     withFullConfig defaultConfigDir testLabel $ \interpreter mockServer dbSync -> do
-      forM_ (replicate 101 mockBlock0) (forgeNextAndSubmit interpreter mockServer)
+      blks <- forM (replicate 101 mockBlock0) (forgeNextAndSubmit interpreter mockServer)
+      print $ length blks
       startDBSync dbSync
       assertBlockNoBackoff dbSync 100
 
@@ -413,7 +415,7 @@ stakeAddressPtr =
     blk <- withAlonzoFindLeaderAndSubmitTx interpreter mockServer $
         Alonzo.mkSimpleDCertTx [ (StakeIndexNew 1, DCertDeleg . RegKey)]
 
-    let ptr = Ptr (blockSlot blk) 0 0
+    let ptr = Ptr (blockSlot blk) (TxIx 0) (CertIx 0)
 
     _ <- withAlonzoFindLeaderAndSubmitTx interpreter mockServer $
       Alonzo.mkPaymentTx (UTxOIndex 0) (UTxOAddressNewWithPtr 0 ptr) 20000 20000
@@ -431,7 +433,7 @@ stakeAddressPtrDereg =
     blk <- withAlonzoFindLeaderAndSubmitTx interpreter mockServer $
         Alonzo.mkSimpleDCertTx [ (StakeIndexNew 0, DCertDeleg . RegKey)]
 
-    let ptr0 = Ptr (blockSlot blk) 0 0
+    let ptr0 = Ptr (blockSlot blk) (TxIx 0) (CertIx 0)
 
     blk' <- withAlonzoFindLeaderAndSubmit interpreter mockServer $ \st -> do
       tx0 <- Alonzo.mkPaymentTx (UTxOIndex 0) (UTxOAddressNewWithPtr 0 ptr0) 20000 20000 st
@@ -440,7 +442,7 @@ stakeAddressPtrDereg =
                                     st
       pure [tx0, tx1]
 
-    let ptr1 = Ptr (blockSlot blk') 1 1
+    let ptr1 = Ptr (blockSlot blk') (TxIx 1) (CertIx 1)
 
     _ <- withAlonzoFindLeaderAndSubmit interpreter mockServer $ \st -> do
         tx0 <- Alonzo.mkPaymentTx (UTxOIndex 1) (UTxOAddressNewWithPtr 0 ptr1) 20000 20000 st
@@ -470,7 +472,7 @@ stakeAddressPtrUseBefore =
       blk <- withAlonzoFindLeaderAndSubmitTx interpreter mockServer $
         Alonzo.mkSimpleDCertTx [ (StakeIndexNew 1, DCertDeleg . RegKey)]
 
-      let ptr = Ptr (blockSlot blk) 0 0
+      let ptr = Ptr (blockSlot blk) (TxIx 0) (CertIx 0)
 
       _ <- withAlonzoFindLeaderAndSubmitTx interpreter mockServer $
         Alonzo.mkPaymentTx (UTxOIndex 0) (UTxOAddressNewWithPtr 0 ptr) 20000 20000
@@ -858,7 +860,7 @@ simpleScript =
   where
     testLabel = "simpleScript"
     getOutFields txOut = (DB.txOutAddress txOut, DB.txOutAddressHasScript txOut, DB.txOutValue txOut, DB.txOutDataHash txOut)
-    expectedFields = ( "addr_test1wpnlxv2xv9a9ucvnvzqakwepzl9ltx7jzgm53av2e9ncv4sysemm8" :: Text
+    expectedFields = ( renderAddress alwaysSucceedsScriptAddr
                      , True, DB.DbLovelace 20000
                      , Just $ Crypto.hashToBytes (extractHash $ hashData plutusDataList))
 

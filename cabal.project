@@ -126,7 +126,7 @@ source-repository-package
     eras/byron/ledger/impl
     eras/byron/ledger/impl/test
     eras/shelley/impl
-    eras/shelley/test-suite
+    -- eras/shelley/test-suite
     eras/shelley-ma/impl
     -- eras/shelley-ma/test-suite
     libs/cardano-ledger-core
@@ -150,7 +150,6 @@ source-repository-package
     cardano-cli
     cardano-git-rev
     cardano-node
-    plutus-example
     trace-dispatcher
     trace-forward
     trace-resources
@@ -229,28 +228,6 @@ source-repository-package
     prettyprinter-configurable
     stubs/plutus-ghc-stub
     word-array
-
-source-repository-package
-  type: git
-  location: https://github.com/input-output-hk/plutus-apps
-  tag: 13946bf6195ed49bf566041c495d3330e38f0599
-  --sha256:
-  subdir:
-    freer-extras
-    plutus-example
-    plutus-ledger
-
-source-repository-package
-  type: git
-  location: https://github.com/input-output-hk/cardano-wallet
-  tag: a5085acbd2670c24251cf8d76a4e83c77a2679ba
-  subdir:
-    lib/core
-    lib/dbvar
-    lib/numeric
-    lib/strict-non-empty-containers
-    lib/test-utils
-    lib/text-class
 
 source-repository-package
   type: git
