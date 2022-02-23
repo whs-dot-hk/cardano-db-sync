@@ -161,6 +161,18 @@ pattern LERewards e m <-
   ShelleyLedgerEventTICK
     (NewEpochEvent (TotalRewardEvent e m))
 
+pattern LEDeltaReward
+    :: (  Crypto ledgerera ~ StandardCrypto
+        , Event (Ledger.EraRule "TICK" ledgerera) ~ TickEvent ledgerera
+        , Event (Ledger.EraRule "NEWEPOCH" ledgerera) ~ NewEpochEvent ledgerera
+        , Event (Ledger.EraRule "RUPD" ledgerera) ~ RupdEvent StandardCrypto
+        )
+    => EpochNo -> Map (Ledger.StakeCredential StandardCrypto) (Set (Ledger.Reward StandardCrypto))
+    -> AuxLedgerEvent (LedgerState (ShelleyBlock ledgerera))
+pattern LEDeltaReward e m <-
+  ShelleyLedgerEventTICK
+    (NewEpochEvent (DeltaRewardEvent (RupdEvent e m)))
+
 pattern LEMirTransfer
     :: ( Crypto ledgerera ~ StandardCrypto
        , Event (Ledger.EraRule "TICK" ledgerera) ~ TickEvent ledgerera
