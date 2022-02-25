@@ -207,9 +207,12 @@ stashPoolRewards
     -> ReaderT SqlBackend m ()
 stashPoolRewards tracer lenv rmap = do
   mMirRwd <- liftIO . atomically $ tryTakeTMVar (leMirRewards lenv)
+  liftIO $ logWarning tracer "stashPoolRewards"
   case mMirRwd of
-    Nothing ->
+    Nothing -> do
+      liftIO $ logWarning tracer "stashPoolRewards putTMVar"
       liftIO . atomically $ putTMVar (lePoolRewards lenv) rmap
+      liftIO $ logWarning tracer "stashPoolRewards putTMVar done"
     Just mirMap -> do
       let totalRwds = Generic.mergeRewards rmap mirMap
       forceInsertRewards tracer lenv totalRwds
@@ -222,8 +225,10 @@ stashMirRewards
 stashMirRewards tracer lenv mirMap = do
   mRwds <- liftIO . atomically $ tryTakeTMVar (lePoolRewards lenv)
   case mRwds of
-    Nothing ->
+    Nothing -> do
+      liftIO $ logWarning tracer "stashMirRewards putTMVar"
       liftIO . atomically $ putTMVar (leMirRewards lenv) mirMap
+      liftIO $ logWarning tracer "stashMirRewards putTMVar done"
     Just rmap -> do
       let totalRwds = Generic.mergeRewards rmap mirMap
       forceInsertRewards tracer lenv totalRwds

@@ -200,9 +200,9 @@ withFullConfig config testLabel action iom migr = do
     cfg <- mkConfig configDir mutableDir
     fingerFile <- prepareFingerprintFile testLabel
     let dbsyncParams = syncNodeParams cfg
-    let trce = nullTracer
+    -- let trce = nullTracer
     -- Replace with this for better debugging of tests
-    -- trce <- configureLogging dbsyncParams "db-sync-node"
+    trce <- configureLogging dbsyncParams "db-sync-node"
     let dbsyncRun = runDbSync emptyMetricsSetters migr iom trce dbsyncParams True 35 35
     let initSt = Consensus.pInfoInitLedger $ protocolInfo cfg
     withInterpreter (protocolInfoForging cfg) nullTracer fingerFile $ \interpreter -> do

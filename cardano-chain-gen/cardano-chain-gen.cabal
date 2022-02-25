@@ -106,6 +106,7 @@ library
                       , plutus-ledger-api
                       , pretty-show
                       , prometheus
+                      , psqueues
                       , random-shuffle
                       , serialise
                       , set-algebra
