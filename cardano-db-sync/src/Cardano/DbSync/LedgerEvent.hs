@@ -29,6 +29,7 @@ import           Cardano.Ledger.Shelley.Rules.NewEpoch (NewEpochEvent (..))
 import           Cardano.Ledger.Shelley.Rules.PoolReap (PoolreapEvent (..))
 import           Cardano.Ledger.Shelley.Rules.Rupd (RupdEvent(RupdEvent))
 import           Cardano.Ledger.Shelley.Rules.Tick (TickEvent (NewEpochEvent))
+import qualified Cardano.Ledger.Shelley.Rules.Tick as Tick
 
 import           Cardano.Prelude hiding (All)
 
@@ -168,14 +169,13 @@ pattern LETotalRewards e m <-
 pattern LEDeltaReward
     :: ( Crypto ledgerera ~ StandardCrypto
        , Event (Ledger.EraRule "TICK" ledgerera) ~ TickEvent ledgerera
-       , Event (Ledger.EraRule "NEWEPOCH" ledgerera) ~ NewEpochEvent ledgerera
        , Event (Ledger.EraRule "RUPD" ledgerera) ~ RupdEvent (Crypto ledgerera)
        )
     => EpochNo -> Map (Ledger.StakeCredential StandardCrypto) (Set (Ledger.Reward StandardCrypto))
     -> AuxLedgerEvent (LedgerState (ShelleyBlock ledgerera))
 pattern LEDeltaReward e m <-
   ShelleyLedgerEventTICK
-    (NewEpochEvent (DeltaRewardEvent (RupdEvent e m)))
+    (Tick.RupdEvent (RupdEvent e m))
 
 pattern LEMirTransfer
     :: ( Crypto ledgerera ~ StandardCrypto
