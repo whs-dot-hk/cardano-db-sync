@@ -6,9 +6,9 @@ DECLARE
 BEGIN
   SELECT stage_two + 1 INTO next_version FROM schema_version ;
   IF next_version = 9 THEN
-    EXECUTE 'ALTER TABLE "stake_address" ADD CONSTRAINT "stake_address_tx_id_fkey" FOREIGN KEY("tx_id") REFERENCES "tx"("id") ON DELETE CASCADE  ON UPDATE RESTRICT' ;
-    EXECUTE 'ALTER TABLE "pool_update" ADD CONSTRAINT "pool_update_reward_addr_id_fkey" FOREIGN KEY("reward_addr_id") REFERENCES "stake_address"("id") ON DELETE CASCADE  ON UPDATE RESTRICT' ;
-    EXECUTE 'ALTER TABLE "pool_owner" ADD CONSTRAINT "pool_owner_pool_update_id_fkey" FOREIGN KEY("pool_update_id") REFERENCES "pool_update"("id") ON DELETE CASCADE  ON UPDATE RESTRICT' ;
+    -- EXECUTE 'ALTER TABLE "stake_address" ADD CONSTRAINT "stake_address_tx_id_fkey" FOREIGN KEY("tx_id") REFERENCES "tx"("id") ON DELETE CASCADE  ON UPDATE RESTRICT' ;
+    -- EXECUTE 'ALTER TABLE "pool_update" ADD CONSTRAINT "pool_update_reward_addr_id_fkey" FOREIGN KEY("reward_addr_id") REFERENCES "stake_address"("id") ON DELETE CASCADE  ON UPDATE RESTRICT' ;
+    -- EXECUTE 'ALTER TABLE "pool_owner" ADD CONSTRAINT "pool_owner_pool_update_id_fkey" FOREIGN KEY("pool_update_id") REFERENCES "pool_update"("id") ON DELETE CASCADE  ON UPDATE RESTRICT' ;
     EXECUTE 'ALTER TABLE "treasury" DROP CONSTRAINT "unique_treasury"' ;
     EXECUTE 'ALTER TABLE "treasury" ADD CONSTRAINT "unique_treasury" UNIQUE("addr_id","tx_id","cert_index")' ;
     EXECUTE 'ALTER TABLE "reserve" DROP CONSTRAINT "unique_reserves"' ;
