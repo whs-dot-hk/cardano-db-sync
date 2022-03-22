@@ -10,7 +10,6 @@
 module Cardano.DbSync.Era.Shelley.Insert
   ( insertShelleyBlock
   , postEpochRewards
-  , postEpochStake
 
   -- These are exported for data in Shelley Genesis
   , insertPoolRegister
@@ -140,6 +139,8 @@ insertShelleyBlock env firstBlockOfEpoch blk lStateSnap details = do
 
     whenJust (lssNewEpoch lStateSnap) $ \ newEpoch -> do
       insertOnNewEpoch tracer blkId (Generic.blkSlotNo blk) (sdEpochNo details) newEpoch
+
+    insertStakeSlice tracer (leIndexCache lenv) (lssStakeSlice lStateSnap)
 
     mbop <- liftIO . atomically $ tryReadTBQueue (leBulkOpQueue lenv)
     whenJust (maybeToStrict mbop) $ \ bop ->
