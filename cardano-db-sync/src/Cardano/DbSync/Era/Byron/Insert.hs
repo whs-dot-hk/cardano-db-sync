@@ -84,9 +84,7 @@ insertABOBBoundary
     -> ExceptT SyncNodeError (ReaderT SqlBackend m) ()
 insertABOBBoundary tracer cache blk details = do
   -- Will not get called in the OBFT part of the Byron era.
-  let prevHash = case Byron.boundaryPrevHash (Byron.boundaryHeader blk) of
-                    Left gh -> Byron.genesisToHeaderHash gh
-                    Right hh -> Byron.unHeaderHash hh
+  let prevHash = Byron.ebbPrevHash blk
   pbid <- queryPrevBlockWithCache "insertABOBBoundary" cache prevHash
   slid <- lift . DB.insertSlotLeader $
                   DB.SlotLeader
@@ -129,7 +127,7 @@ insertABlock
     => Trace IO Text -> Cache -> Bool -> Byron.ABlock ByteString -> SlotDetails
     -> ExceptT SyncNodeError (ReaderT SqlBackend m) ()
 insertABlock tracer cache firstBlockOfEpoch blk details = do
-    pbid <- queryPrevBlockWithCache "insertABlock" cache (Byron.unHeaderHash $ Byron.blockPreviousHash blk)
+    pbid <- queryPrevBlockWithCache "insertABlock" cache (Byron.blockPreviousHash blk)
     slid <- lift . DB.insertSlotLeader $ Byron.mkSlotLeader blk
     blkId <- lift . insertBlockAndCache cache $
                   DB.Block
