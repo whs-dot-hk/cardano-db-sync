@@ -47,8 +47,8 @@ rollbackToPoint backend trce point =
                 ]
         -- We delete the block right after the point we rollback to. This delete
         -- should cascade to the rest of the chain.
-        prevId <- liftLookupFail "Rollback.rollbackToPoint" $ queryBlockId point
-        deleted <- lift $ DB.deleteCascadeAfter prevId
+        blkNo <- liftLookupFail "Rollback.rollbackToPoint" $ queryBlockNo point
+        deleted <- lift $ DB.deleteAfterBlockNo blkNo
         liftIO . logInfo trce $
                     if deleted
                       then "Blocks deleted"
@@ -60,11 +60,11 @@ rollbackToPoint backend trce point =
         Origin -> DB.querySlotNos
         At sl -> DB.querySlotNosGreaterThan (unSlotNo sl)
 
-    queryBlockId :: MonadIO m => Point CardanoBlock -> ReaderT SqlBackend m (Either DB.LookupFail DB.BlockId)
-    queryBlockId pnt =
+    queryBlockNo :: MonadIO m => Point CardanoBlock -> ReaderT SqlBackend m (Either DB.LookupFail BlockNo)
+    queryBlockNo pnt =
       case getPoint pnt of
-        Origin -> DB.queryGenesis
-        At blk -> DB.queryBlockId (SBS.fromShort . getOneEraHash $ blockPointHash blk)
+        Origin -> panic "rollbackToPoint: At Origin"
+        At blk -> DB.queryBlockHash (SBS.fromShort . getOneEraHash $ blockPointHash blk)
 
 -- For testing and debugging.
 unsafeRollback :: Trace IO Text -> DB.PGConfig -> SlotNo -> IO (Either SyncNodeError ())

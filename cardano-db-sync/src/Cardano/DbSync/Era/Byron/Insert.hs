@@ -78,10 +78,6 @@ insertABOBBoundary
     -> ExceptT SyncNodeError (ReaderT SqlBackend m) ()
 insertABOBBoundary tracer blk details = do
   -- Will not get called in the OBFT part of the Byron era.
-  let prevHash = case Byron.boundaryPrevHash (Byron.boundaryHeader blk) of
-                    Left gh -> Byron.genesisToHeaderHash gh
-                    Right hh -> Byron.unHeaderHash hh
-  pbid <- liftLookupFail "insertABOBBoundary" $ DB.queryBlockId prevHash
   slid <- lift . DB.insertSlotLeader $
                   DB.SlotLeader
                     { DB.slotLeaderHash = BS.replicate 28 '\0'
@@ -96,7 +92,6 @@ insertABOBBoundary tracer blk details = do
               , DB.blockSlotNo = Nothing
               , DB.blockEpochSlotNo = Nothing
               , DB.blockBlockNo = Nothing
-              , DB.blockPreviousId = Just pbid
               , DB.blockSlotLeaderId = slid
               , DB.blockSize = fromIntegral $ Byron.boundaryBlockLength blk
               , DB.blockTime = sdSlotTime details
@@ -123,16 +118,15 @@ insertABlock
     => Trace IO Text -> Bool -> Byron.ABlock ByteString -> SlotDetails
     -> ExceptT SyncNodeError (ReaderT SqlBackend m) ()
 insertABlock tracer firstBlockOfEpoch blk details = do
-    pbid <- liftLookupFail "insertABlock" $ DB.queryBlockId (Byron.unHeaderHash $ Byron.blockPreviousHash blk)
     slid <- lift . DB.insertSlotLeader $ Byron.mkSlotLeader blk
-    blkId <- lift . DB.insertBlock $
+    let blkNo = Byron.blockNumber blk
+    void . lift . DB.insertBlock $
                   DB.Block
                     { DB.blockHash = Byron.blockHash blk
                     , DB.blockEpochNo = Just $ unEpochNo (sdEpochNo details)
                     , DB.blockSlotNo = Just $ Byron.slotNumber blk
                     , DB.blockEpochSlotNo = Just $ unEpochSlot (sdEpochSlot details)
-                    , DB.blockBlockNo = Just $ Byron.blockNumber blk
-                    , DB.blockPreviousId = Just pbid
+                    , DB.blockBlockNo = Just blkNo
                     , DB.blockSlotLeaderId = slid
                     , DB.blockSize = fromIntegral $ Byron.blockLength blk
                     , DB.blockTime = sdSlotTime details
@@ -145,14 +139,14 @@ insertABlock tracer firstBlockOfEpoch blk details = do
                     , DB.blockOpCertCounter = Nothing
                     }
 
-    zipWithM_ (insertTx tracer blkId) (Byron.blockPayload blk) [ 0 .. ]
+    zipWithM_ (insertTx tracer blkNo) (Byron.blockPayload blk) [ 0 .. ]
 
     liftIO $ do
       let epoch = unEpochNo (sdEpochNo details)
           slotWithinEpoch = unEpochSlot (sdEpochSlot details)
           followingClosely = getSyncStatus details == SyncFollowing
 
-      when (followingClosely && slotWithinEpoch /= 0 && Byron.blockNumber blk `mod` 20 == 0) $ do
+      when (followingClosely && slotWithinEpoch /= 0 && blkNo `mod` 20 == 0) $ do
         logInfo tracer $
           mconcat
             [ "insertByronBlock: continuing epoch ", textShow epoch
@@ -162,7 +156,7 @@ insertABlock tracer firstBlockOfEpoch blk details = do
       logger followingClosely tracer $ mconcat
         [ "insertByronBlock: epoch ", textShow (unEpochNo $ sdEpochNo details)
         , ", slot ", textShow (Byron.slotNumber blk)
-        , ", block ", textShow (Byron.blockNumber blk)
+        , ", block ", textShow blkNo
         , ", hash ", renderByteArray (Byron.blockHash blk)
         ]
   where
@@ -176,15 +170,15 @@ insertABlock tracer firstBlockOfEpoch blk details = do
 
 insertTx
     :: (MonadBaseControl IO m, MonadIO m)
-    => Trace IO Text -> DB.BlockId -> Byron.TxAux -> Word64
+    => Trace IO Text -> Word64 -> Byron.TxAux -> Word64
     -> ExceptT SyncNodeError (ReaderT SqlBackend m) ()
-insertTx tracer blkId tx blockIndex = do
+insertTx tracer blkNo tx blockIndex = do
     resolvedInputs <- mapM resolveTxInputs (toList $ Byron.txInputs (Byron.taTx tx))
     valFee <- firstExceptT annotateTx $ ExceptT $ pure (calculateTxFee (Byron.taTx tx) resolvedInputs)
     txId <- lift . DB.insertTx $
               DB.Tx
                 { DB.txHash = Byron.unTxHash $ Crypto.serializeCborHash (Byron.taTx tx)
-                , DB.txBlockId = blkId
+                , DB.txBlockNo = blkNo
                 , DB.txBlockIndex = blockIndex
                 , DB.txOutSum = vfValue valFee
                 , DB.txFee = vfFee valFee

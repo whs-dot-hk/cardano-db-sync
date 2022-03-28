@@ -30,6 +30,7 @@ import qualified Cardano.Ledger.Keys as Ledger
 
 import           Cardano.DbSync.Util
 
+import           Cardano.Slotting.Block (BlockNo (..))
 import           Cardano.Slotting.Slot (SlotNo (..))
 
 import           Database.Esqueleto.Experimental (SqlBackend, Value (..), desc, from, innerJoin,
@@ -67,7 +68,7 @@ queryStakePoolKeyHash kh = do
     (blk :& _ :& _ :& poolHash) <-
       from $ table @Block
       `innerJoin` table @Tx
-      `on` (\(blk :& tx) -> blk ^. BlockId ==. tx ^. TxBlockId)
+      `on` (\(blk :& tx) -> blk ^. BlockBlockNo ==. just (tx ^. TxBlockNo))
       `innerJoin` table @PoolUpdate
       `on` (\(_ :& tx :& poolUpdate) -> tx ^. TxId ==. poolUpdate ^. PoolUpdateRegisteredTxId)
       `innerJoin` table @PoolHash
@@ -103,9 +104,9 @@ queryStakeAddressRef addr =
         (dlg :& tx :& blk) <-
           from $ table @Delegation
           `innerJoin` table @Tx
-          `on` (\(dlg :& tx) -> tx ^. TxId ==. dlg ^. DelegationTxId)
+          `on` (\(dlg :& tx) -> tx ^. TxBlockNo ==. dlg ^. DelegationBlockNo)
           `innerJoin` table @Block
-          `on` (\(_dlg :& tx :& blk) -> blk ^. BlockId ==. tx ^. TxBlockId)
+          `on` (\(_dlg :& tx :& blk) -> blk ^. BlockBlockNo ==. just (tx ^. TxBlockNo))
 
         where_ (blk ^. BlockSlotNo ==. just (val slot))
         where_ (tx ^. TxBlockIndex ==. val (fromIntegral txIx))
@@ -143,9 +144,9 @@ queryStakeRefPtr (Ptr (SlotNo slot) txIx certIx) = do
     (blk :& tx :& sr) <-
       from $ table @Block
       `innerJoin` table @Tx
-      `on` (\(blk :& tx) -> blk ^. BlockId ==. tx ^. TxBlockId)
+      `on` (\(blk :& tx) -> blk ^. BlockBlockNo ==. just (tx ^. TxBlockNo))
       `innerJoin` table @StakeRegistration
-      `on` (\(_blk :& tx :& sr) -> sr ^. StakeRegistrationTxId ==. tx ^. TxId)
+      `on` (\(_blk :& tx :& sr) -> sr ^. StakeRegistrationBlockNo ==. tx ^. TxBlockNo)
 
     where_ (blk ^. BlockSlotNo ==. just (val slot))
     where_ (tx ^. TxBlockIndex ==. val (fromIntegral txIx))
@@ -172,17 +173,17 @@ queryPoolHashIdPair pkh = do
     convert (Value phid) = (pkh, phid)
 
 -- Check if there are other PoolUpdates in the same blocks for the same pool
-queryPoolUpdateByBlock :: MonadIO m => BlockId -> PoolHashId -> ReaderT SqlBackend m Bool
-queryPoolUpdateByBlock blkId poolHashId = do
+queryPoolUpdateByBlock :: MonadIO m => BlockNo -> PoolHashId -> ReaderT SqlBackend m Bool
+queryPoolUpdateByBlock (BlockNo blkNo) poolHashId = do
     res <- select $ do
       (blk :& _tx :& poolUpdate) <-
         from $ table @Block
         `innerJoin` table @Tx
-        `on` (\(blk :& tx) -> blk ^. BlockId ==. tx ^. TxBlockId)
+        `on` (\(blk :& tx) -> blk ^. BlockBlockNo ==. just (tx ^. TxBlockNo))
         `innerJoin` table @PoolUpdate
         `on` (\(_blk :& tx :& poolUpdate) -> tx ^. TxId ==. poolUpdate ^. PoolUpdateRegisteredTxId)
       where_ (poolUpdate ^. PoolUpdateHashId ==. val poolHashId)
-      where_ (blk ^. BlockId ==. val blkId)
+      where_ (blk ^. BlockBlockNo ==. just (val blkNo))
       limit 1
       pure (blk ^. BlockEpochNo)
     pure $ not (null res)

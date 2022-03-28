@@ -8,7 +8,7 @@ BEGIN
     CREATE INDEX idx_datum_tx_id ON datum (tx_id) ;
     CREATE INDEX idx_redeemer_datum_id ON redeemer (datum_id) ;
     CREATE INDEX idx_extra_key_witness_tx_id ON extra_key_witness (tx_id) ;
-    CREATE INDEX idx_cost_model_block_id ON cost_model (block_id) ;
+    CREATE INDEX idx_cost_model_block_no ON cost_model (block_no) ;
     CREATE INDEX idx_param_proposal_cost_model_id ON param_proposal (cost_model_id) ;
     CREATE INDEX idx_epoch_param_cost_model_id ON epoch_param (cost_model_id) ;
 

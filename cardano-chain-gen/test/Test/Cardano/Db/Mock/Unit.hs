@@ -256,12 +256,12 @@ rollbackFurther =
     -- validate later that one is deleted through cascade, but the other was not
     -- because a checkpoint was found.
     let blockHash1 = hfBlockHash (blks !! 34)
-    Right bid1 <- queryDBSync dbSync $ DB.queryBlockId blockHash1
-    cm1 <- queryDBSync dbSync $ DB.insertCostModel $ DB.CostModel "{\"1\" : 1}" bid1
+    void $ queryDBSync dbSync $ DB.queryBlockId blockHash1
+    cm1 <- queryDBSync dbSync $ DB.insertCostModel $ DB.CostModel "{\"1\" : 1}" 34
 
     let blockHash2 = hfBlockHash (blks !! 35)
-    Right bid2 <- queryDBSync dbSync $ DB.queryBlockId blockHash2
-    cm2 <- queryDBSync dbSync $ DB.insertCostModel $ DB.CostModel "{\"2\" : 2}" bid2
+    void $ queryDBSync dbSync $ DB.queryBlockId blockHash2
+    cm2 <- queryDBSync dbSync $ DB.insertCostModel $ DB.CostModel "{\"2\" : 2}" 35
 
     -- Note that there is no epoch change, which would add a new entry, since we have
     -- 80 blocks and not 100, which is the expected blocks/epoch. This also means there

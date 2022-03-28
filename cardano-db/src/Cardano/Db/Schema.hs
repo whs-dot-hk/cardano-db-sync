@@ -86,7 +86,6 @@ share
     slotNo              Word64 Maybe        sqltype=word63type
     epochSlotNo         Word64 Maybe        sqltype=word31type
     blockNo             Word64 Maybe        sqltype=word31type
-    previousId          BlockId Maybe
     slotLeaderId        SlotLeaderId
     size                Word64              sqltype=word31type
     time                UTCTime             sqltype=timestamp
@@ -101,7 +100,7 @@ share
 
   Tx
     hash                ByteString          sqltype=hash32type
-    blockId             BlockId
+    blockNo             Word64              sqltype=word63type
     blockIndex          Word64              sqltype=word31type    -- The index of this transaction within the block.
     outSum              DbLovelace          sqltype=lovelace
     fee                 DbLovelace          sqltype=lovelace
@@ -121,7 +120,7 @@ share
     hashRaw             ByteString          sqltype=addr29type
     view                Text
     scriptHash          ByteString Maybe    sqltype=hash28type
-    txId                TxId
+    blockNo             Word64              sqltype=word63type
     UniqueStakeAddress  hashRaw
 
   TxOut
@@ -192,8 +191,8 @@ share
     utxo                DbLovelace          sqltype=lovelace
     deposits            DbLovelace          sqltype=lovelace
     fees                DbLovelace          sqltype=lovelace
-    blockId             BlockId
-    UniqueAdaPots       blockId
+    blockNo             Word64              sqltype=word63type
+    UniqueAdaPots       blockNo
     deriving Eq
 
   -- -----------------------------------------------------------------------------------------------
@@ -251,27 +250,27 @@ share
     addrId              StakeAddressId
     certIndex           Word16
     epochNo             Word64              sqltype=word31type
-    txId                TxId
-    UniqueStakeRegistration txId certIndex
+    blockNo             Word64              sqltype=word63type
+    UniqueStakeRegistration blockNo certIndex
 
   -- When was a staking key/script deregistered
   StakeDeregistration
     addrId              StakeAddressId
     certIndex           Word16
     epochNo             Word64              sqltype=word31type
-    txId                TxId
+    blockNo             Word64              sqltype=word63type
     redeemerId          RedeemerId Maybe
-    UniqueStakeDeregistration txId certIndex
+    UniqueStakeDeregistration blockNo certIndex
 
   Delegation
     addrId              StakeAddressId
     certIndex           Word16
     poolHashId          PoolHashId
     activeEpochNo       Word64
-    txId                TxId
+    blockNo             Word64              sqltype=word63type
     slotNo              Word64              sqltype=word63type
     redeemerId          RedeemerId Maybe
-    UniqueDelegation    txId certIndex
+    UniqueDelegation    blockNo certIndex
 
   TxMetadata
     key                 DbWord64            sqltype=word64type
@@ -319,22 +318,22 @@ share
     addrId              StakeAddressId
     certIndex           Word16
     amount              DbInt65             sqltype=int65type
-    txId                TxId
-    UniqueTreasury      addrId txId certIndex
+    blockNo             Word64              sqltype=word63type -- Block number containing the tx
+    UniqueTreasury      addrId blockNo certIndex
 
   Reserve
     addrId              StakeAddressId
     certIndex           Word16
     amount              DbInt65             sqltype=int65type
-    txId                TxId
-    UniqueReserves      addrId txId certIndex
+    blockNo             Word64              sqltype=word63type -- Block number containing the tx
+    UniqueReserves      addrId blockNo certIndex
 
   PotTransfer
     certIndex           Word16
     treasury            DbInt65             sqltype=int65type
     reserves            DbInt65             sqltype=int65type
-    txId                TxId
-    UniquePotTransfer   txId certIndex
+    blockNo             Word64              sqltype=word63type -- Block number containing the tx
+    UniquePotTransfer   blockNo certIndex
 
   EpochSyncTime
     no                  Word64
@@ -437,8 +436,8 @@ share
     collateralPercent   Word16 Maybe        sqltype=word31type
     maxCollateralInputs Word16 Maybe        sqltype=word31type
 
-    registeredTxId      TxId
-    UniqueParamProposal key registeredTxId
+    blockNo             Word64              sqltype=word63type
+    UniqueParamProposal key blockNo
 
   EpochParam
     epochNo             Word64              sqltype=word31type
@@ -474,13 +473,11 @@ share
     maxValSize          DbWord64 Maybe      sqltype=word64type
     collateralPercent   Word16 Maybe        sqltype=word31type
     maxCollateralInputs Word16 Maybe        sqltype=word31type
-
-    blockId             BlockId
-    UniqueEpochParam    epochNo blockId
+    UniqueEpochParam    epochNo
 
   CostModel
     costs               Text                sqltype=jsonb
-    blockId             BlockId
+    blockNo             Word64              sqltype=word63type
     UniqueCostModel     costs
 
   -- -----------------------------------------------------------------------------------------------
@@ -562,7 +559,6 @@ schemaDocs =
       BlockSlotNo # "The slot number."
       BlockEpochSlotNo # "The slot number within an epoch (resets to zero at the start of each epoch)."
       BlockBlockNo # "The block number."
-      BlockPreviousId # "The Block table index of the previous block."
       BlockSlotLeaderId # "The SlotLeader table index of the creator of this block."
       BlockSize # "The block size (in bytes). Note, this size value is not expected to be the same as the sum of the tx sizes due to the fact that txs being stored in segwit format and oddities in the CBOR encoding."
       BlockTime # "The block time (UTCTime)."
@@ -577,7 +573,7 @@ schemaDocs =
     Tx --^ do
       "A table for transactions within a block on the chain."
       TxHash # "The hash identifier of the transaction."
-      TxBlockId # "The Block table index of the block that contains this transaction."
+      TxBlockNo # "The Block number of the block that contains this transaction."
       TxBlockIndex # "The index of this transaction with the block (zero based)."
       TxOutSum # "The sum of the transaction outputs (in Lovelace)."
       TxFee # "The fees paid for this transaction."
@@ -593,7 +589,7 @@ schemaDocs =
       StakeAddressHashRaw # "The raw bytes of the stake address hash."
       StakeAddressView # "The Bech32 encoded version of the stake address."
       StakeAddressScriptHash # "The script hash, in case this address is locked by a script."
-      StakeAddressTxId # "The Tx table index of the transaction in which this address first appeared."
+      StakeAddressBlockNo # "The block number in which this address first appeared."
 
     TxOut --^ do
       "A table for transaction outputs."
@@ -647,7 +643,7 @@ schemaDocs =
       AdaPotsUtxo # "The amount (in Lovelace) in the UTxO set."
       AdaPotsDeposits # "The amount (in Lovelace) in the deposit pot."
       AdaPotsFees # "The amount (in Lovelace) in the fee pot."
-      AdaPotsBlockId # "The Block table index of the block for which this snapshot was taken."
+      AdaPotsBlockNo # "The block number of the block for which this snapshot was taken."
 
     PoolMetadataRef --^ do
       "An on-chain reference to off-chain pool metadata."
@@ -694,14 +690,14 @@ schemaDocs =
       StakeRegistrationAddrId # "The StakeAddress table index for the stake address."
       StakeRegistrationCertIndex # "The index of this stake registration within the certificates of this transaction."
       StakeRegistrationEpochNo # "The epoch in which the registration took place."
-      StakeRegistrationTxId # "The Tx table index of the transaction where this stake address was registered."
+      StakeRegistrationBlockNo # "The block number containing the transaction where this stake address was registered."
 
     StakeDeregistration --^ do
       "A table containing stake address deregistrations."
       StakeDeregistrationAddrId # "The StakeAddress table index for the stake address."
       StakeDeregistrationCertIndex # "The index of this stake deregistration within the certificates of this transaction."
       StakeDeregistrationEpochNo # "The epoch in which the deregistration took place."
-      StakeDeregistrationTxId # "The Tx table index of the transaction where this stake address was deregistered."
+      StakeDeregistrationBlockNo # "The block number containing the transaction where this stake address was deregistered."
       StakeDeregistrationRedeemerId # "The Redeemer table index that is related with this certificate."
 
     Delegation --^ do
@@ -710,7 +706,7 @@ schemaDocs =
       DelegationCertIndex # "The index of this delegation within the certificates of this transaction."
       DelegationPoolHashId # "The PoolHash table index for the pool being delegated to."
       DelegationActiveEpochNo # "The epoch number where this delegation becomes active."
-      DelegationTxId # "The Tx table index of the transaction that contained this delegation."
+      DelegationBlockNo # "The block number containing the transaction that contained this delegation."
       DelegationSlotNo # "The slot number of the block that contained this delegation."
       DelegationRedeemerId # "The Redeemer table index that is related with this certificate."
 
@@ -754,7 +750,7 @@ schemaDocs =
       TreasuryAddrId # "The StakeAddress table index for the stake address for this Treasury entry."
       TreasuryCertIndex # "The index of this payment certificate within the certificates of this transaction."
       TreasuryAmount # "The payment amount (in Lovelace)."
-      TreasuryTxId # "The Tx table index for the transaction that contains this payment."
+      TreasuryBlockNo # "The block number containing the transaction that contains this payment."
 
     Reserve --^ do
       "A table for payments from the reserves to a StakeAddress. Note: Before protocol version 5.0\
@@ -764,14 +760,14 @@ schemaDocs =
       ReserveAddrId # "The StakeAddress table index for the stake address for this Treasury entry."
       ReserveCertIndex # "The index of this payment certificate within the certificates of this transaction."
       ReserveAmount # "The payment amount (in Lovelace)."
-      ReserveTxId # "The Tx table index for the transaction that contains this payment."
+      ReserveBlockNo # "The block number containing the transaction that contains this payment."
 
     PotTransfer --^ do
       "A table containing transfers between the reserves pot and the treasury pot."
       PotTransferCertIndex # "The index of this transfer certificate within the certificates of this transaction."
       PotTransferTreasury # "The amount (in Lovelace) the treasury balance changes by."
       PotTransferReserves # "The amount (in Lovelace) the reserves balance changes by."
-      PotTransferTxId # "The Tx table index for the transaction that contains this transfer."
+      PotTransferBlockNo # "The block number containing the transaction that contains this transfer."
 
     EpochSyncTime --^ do
       "A table containing the time required to fully sync an epoch."
@@ -861,7 +857,7 @@ schemaDocs =
       ParamProposalMaxValSize # "The maximum Val size."
       ParamProposalCollateralPercent # "The percentage of the txfee which must be provided as collateral when including non-native scripts."
       ParamProposalMaxCollateralInputs # "The maximum number of collateral inputs allowed in a transaction."
-      ParamProposalRegisteredTxId # "The Tx table index for the transaction that contains this parameter proposal."
+      ParamProposalBlockNo # "The block number containing the transaction that contains this parameter proposal."
 
     EpochParam --^ do
       "The accepted protocol parameters for an epoch."
@@ -896,12 +892,11 @@ schemaDocs =
       EpochParamMaxValSize # "The maximum Val size."
       EpochParamCollateralPercent # "The percentage of the txfee which must be provided as collateral when including non-native scripts."
       EpochParamMaxCollateralInputs # "The maximum number of collateral inputs allowed in a transaction."
-      EpochParamBlockId # "The Block table index for the first block where these parameters are valid."
 
     CostModel --^ do
       "CostModel for EpochParam and ParamProposal."
       CostModelCosts # "The actual costs formatted as json."
-      CostModelBlockId # "The first block where these costs were introduced. This is only used for rollbacks."
+      CostModelBlockNo # "The block number where these costs were introduced. This is only used for rollbacks."
 
     PoolOfflineData --^ do
       "The pool offline (ie not on chain) for a stake pool."

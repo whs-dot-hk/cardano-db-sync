@@ -1,5 +1,7 @@
+{-# LANGUAGE TypeApplications #-}
 module Cardano.Db.Delete
-  ( deleteCascadeBlock
+  ( deleteAfterBlockNo
+  , deleteCascadeBlock
   , deleteCascadeAfter
   , deleteCascadeBlockNo
   , deleteCascadeSlotNo
@@ -11,52 +13,85 @@ import           Cardano.Slotting.Slot (SlotNo (..))
 import           Control.Monad.IO.Class (MonadIO)
 import           Control.Monad.Trans.Reader (ReaderT)
 
-import           Database.Persist.Sql (SqlBackend, delete, selectKeysList, (!=.), (==.))
+import           Database.Esqueleto.Experimental (delete, deleteCount, from, just, table, val,
+                   where_, (==.), (>=.), (^.))
+
+import           Database.Persist.Sql (SqlBackend)
 
 import           Data.ByteString (ByteString)
+import           Data.Int (Int64)
 
+import           Cardano.Db.Query (isJust)
 import           Cardano.Db.Schema
 
 import           Ouroboros.Network.Block (BlockNo (..))
 
 
+-- | Delete all blocks with a block number greater than or equal to the supplied `BlockNo`.
+-- Returns 'True' if any blocks were deleted and 'False' if none were found.
+deleteAfterBlockNo :: MonadIO m => BlockNo -> ReaderT SqlBackend m Bool
+deleteAfterBlockNo (BlockNo blkNo) = do
+  count <- deleteCount $ do
+            blk <- from $ table @Block
+            where_ (blk ^. BlockBlockNo >=. just (val blkNo))
+
+  delete $ from (table @Delegation) >>= \ d -> where_ (d ^. DelegationBlockNo >=. val blkNo)
+  delete $ from (table @StakeDeregistration) >>= \ sd -> where_ (sd ^. StakeDeregistrationBlockNo >=. val blkNo)
+  delete $ from (table @StakeRegistration) >>= \ sr -> where_ (sr ^. StakeRegistrationBlockNo >=. val blkNo)
+  delete $ from (table @Tx) >>= \ tx -> where_ (tx ^. TxBlockNo >=. val blkNo)
+
+  pure $ isNonZero count
+
 -- | Delete a block if it exists. Returns 'True' if it did exist and has been
 -- deleted and 'False' if it did not exist.
 deleteCascadeBlock :: MonadIO m => Block -> ReaderT SqlBackend m Bool
 deleteCascadeBlock block = do
-  keys <- selectKeysList [ BlockHash ==. blockHash block ] []
-  mapM_ delete keys
-  pure $ not (null keys)
+  isNonZero <$$>
+    deleteCount $ do
+      blk <- from $ table @Block
+      where_ (blk ^. BlockHash ==. val (blockHash block))
 
 -- | Delete a block after the specified 'BlockId'. Returns 'True' if it did exist and has been
 -- deleted and 'False' if it did not exist.
-deleteCascadeAfter :: MonadIO m => BlockId -> ReaderT SqlBackend m Bool
-deleteCascadeAfter bid = do
-  -- Genesis artificial blocks are not deleted (Byron or Shelley) since they have null epoch
-  keys <- selectKeysList [ BlockPreviousId ==. Just bid, BlockEpochNo !=. Nothing ] []
-  mapM_ delete keys
-  pure $ not (null keys)
+deleteCascadeAfter :: MonadIO m => BlockNo -> ReaderT SqlBackend m Bool
+deleteCascadeAfter (BlockNo blkNo) = do
+  isNonZero <$$>
+    deleteCount $ do
+      blk <- from $ table @Block
+      where_ (isJust $ blk ^. BlockEpochNo)
+      where_ (blk ^. BlockBlockNo ==. just (val blkNo))
 
 -- | Delete a block if it exists. Returns 'True' if it did exist and has been
 -- deleted and 'False' if it did not exist.
 deleteCascadeBlockNo :: MonadIO m => BlockNo -> ReaderT SqlBackend m Bool
-deleteCascadeBlockNo (BlockNo blockNo) = do
-  keys <- selectKeysList [ BlockBlockNo ==. Just blockNo ] []
-  mapM_ delete keys
-  pure $ not (null keys)
+deleteCascadeBlockNo (BlockNo blkNo) = do
+  isNonZero <$$>
+    deleteCount $ do
+      blk <- from $ table @Block
+      where_ (blk ^. BlockBlockNo ==. just (val blkNo))
 
 -- | Delete a block if it exists. Returns 'True' if it did exist and has been
 -- deleted and 'False' if it did not exist.
 deleteCascadeSlotNo :: MonadIO m => SlotNo -> ReaderT SqlBackend m Bool
 deleteCascadeSlotNo (SlotNo slotNo) = do
-  keys <- selectKeysList [ BlockSlotNo ==. Just slotNo ] []
-  mapM_ delete keys
-  pure $ not (null keys)
+  isNonZero <$$>
+    deleteCount $ do
+      blk <- from $ table @Block
+      where_ (blk ^. BlockSlotNo ==. just (val slotNo))
 
 -- | Delete a delisted pool if it exists. Returns 'True' if it did exist and has been
 -- deleted and 'False' if it did not exist.
 deleteDelistedPool :: MonadIO m => ByteString -> ReaderT SqlBackend m Bool
 deleteDelistedPool poolHash = do
-  keys <- selectKeysList [ DelistedPoolHashRaw ==. poolHash ] []
-  mapM_ delete keys
-  pure $ not (null keys)
+  isNonZero <$$>
+    deleteCount $ do
+      delisted <- from $ table @DelistedPool
+      where_ (delisted ^. DelistedPoolHashRaw ==. val poolHash)
+
+-- -------------------------------------------------------------------------------------------------
+
+(<$$>) :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
+(<$$>) = fmap . fmap
+
+isNonZero :: Int64 -> Bool
+isNonZero = (> 0)

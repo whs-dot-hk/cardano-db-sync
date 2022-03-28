@@ -82,7 +82,7 @@ queryOrphanedRewards (EpochNo epochNo) = do
       where_ (notExists $ do
                  reg <- from $ table @Db.StakeRegistration
                  where_ (reg ^. Db.StakeRegistrationAddrId ==. dereg ^. Db.StakeDeregistrationAddrId
-                          &&. reg ^. Db.StakeRegistrationTxId >. dereg ^. Db.StakeDeregistrationTxId))
+                          &&. reg ^. Db.StakeRegistrationBlockNo >. dereg ^. Db.StakeDeregistrationBlockNo))
       pure (dereg ^. Db.StakeDeregistrationAddrId, rwd ^. Db.RewardAmount)
     pure $ convert (map Db.unValue2 $ res1 ++ res2)
   where

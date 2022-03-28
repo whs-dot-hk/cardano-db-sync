@@ -72,7 +72,7 @@ queryBlockTxCount blockNo = do
     (blk :& _tx) <-
       from $ table @Block
       `innerJoin` table @Tx
-      `on` (\(blk :& tx) -> blk ^. BlockId ==. tx ^. TxBlockId)
+      `on` (\(blk :& tx) -> blk ^. BlockBlockNo ==. just (tx ^. TxBlockNo))
     where_ (blk ^. BlockBlockNo ==. just (val blockNo))
     pure countRows
   pure $ maybe 0 unValue (listToMaybe res)

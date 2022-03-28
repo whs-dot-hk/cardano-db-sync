@@ -76,30 +76,29 @@ queryWalkChain count blkNo
 
 createAndInsertBlocks :: (MonadBaseControl IO m, MonadIO m) => Word64 -> ReaderT SqlBackend m ()
 createAndInsertBlocks blockCount =
-    void $ loop (0, Nothing, Nothing)
+    void $ loop (0, Nothing)
   where
     loop
         :: (MonadBaseControl IO m, MonadIO m)
-        => (Word64, Maybe BlockId, Maybe TxId)
-        -> ReaderT SqlBackend m (Word64, Maybe BlockId, Maybe TxId)
-    loop (indx, mPrevId, mOutId) =
+        => (Word64, Maybe TxId)
+        -> ReaderT SqlBackend m (Word64, Maybe TxId)
+    loop (indx, mOutId) =
       if indx < blockCount
-        then loop =<< createAndInsert (indx, mPrevId, mOutId)
-        else pure (0, Nothing, Nothing)
+        then loop =<< createAndInsert (indx, mOutId)
+        else pure (0, Nothing)
 
     createAndInsert
         :: (MonadBaseControl IO m, MonadIO m)
-        => (Word64, Maybe BlockId, Maybe TxId)
-        -> ReaderT SqlBackend m (Word64, Maybe BlockId, Maybe TxId)
-    createAndInsert (indx, mPrevId, mTxOutId) = do
+        => (Word64, Maybe TxId)
+        -> ReaderT SqlBackend m (Word64, Maybe TxId)
+    createAndInsert (blkNo, mTxOutId) = do
         slid <- insertSlotLeader testSlotLeader
         let newBlock = Block
-                        { blockHash = mkBlockHash indx
+                        { blockHash = mkBlockHash blkNo
                         , blockEpochNo = Just 0
-                        , blockSlotNo = Just indx
-                        , blockEpochSlotNo = Just indx
-                        , blockBlockNo = Just indx
-                        , blockPreviousId = mPrevId
+                        , blockSlotNo = Just blkNo
+                        , blockEpochSlotNo = Just blkNo
+                        , blockBlockNo = Just blkNo
                         , blockSlotLeaderId = slid
                         , blockSize = 42
                         , blockTime = dummyUTCTime
@@ -111,21 +110,22 @@ createAndInsertBlocks blockCount =
                         , blockOpCertCounter = Nothing
                         }
 
-        blkId <- insertBlock newBlock
-        newMTxOutId <- if indx /= 0
-                      then pure mTxOutId
-                      else do
-                        txId <- insertTx $ Tx (mkTxHash blkId 0) blkId 0 (DbLovelace 0) (DbLovelace 0) 0 12 Nothing Nothing True 0
-                        void $ insertTxOut (mkTxOut blkId txId)
-                        pure $ Just txId
-        case (indx, mTxOutId) of
+        void $ insertBlock newBlock
+        newMTxOutId <-
+                if blkNo /= 0
+                  then pure mTxOutId
+                  else do
+                    txId <- insertTx $ Tx (mkTxHash blkNo 0) blkNo 0 (DbLovelace 0) (DbLovelace 0) 0 12 Nothing Nothing True 0
+                    void $ insertTxOut (mkTxOut blkNo txId)
+                    pure $ Just txId
+        case (blkNo, mTxOutId) of
             (8, Just txOutId) -> do
                 -- Insert Txs here to test that they are cascade deleted when the blocks
                 -- they are associcated with are deleted.
 
-                txId <- head <$> mapM insertTx (mkTxs blkId 8)
+                txId <- head <$> mapM insertTx (mkTxs blkNo 8)
                 void $ insertTxIn (TxIn txId txOutId 0 Nothing)
-                void $ insertTxOut (mkTxOut blkId txId)
+                void $ insertTxOut (mkTxOut blkNo txId)
             _ -> pure ()
-        pure (indx + 1, Just blkId, newMTxOutId)
+        pure (blkNo + 1, newMTxOutId)
 
