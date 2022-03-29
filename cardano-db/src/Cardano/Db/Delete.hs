@@ -22,6 +22,7 @@ import           Data.ByteString (ByteString)
 import           Data.Int (Int64)
 
 import           Cardano.Db.Query (isJust)
+import           Cardano.Db.Run (transactionCommit)
 import           Cardano.Db.Schema
 
 import           Ouroboros.Network.Block (BlockNo (..))
@@ -39,7 +40,10 @@ deleteAfterBlockNo (BlockNo blkNo) = do
   delete $ from (table @StakeDeregistration) >>= \ sd -> where_ (sd ^. StakeDeregistrationBlockNo >. val blkNo)
   delete $ from (table @StakeRegistration) >>= \ sr -> where_ (sr ^. StakeRegistrationBlockNo >. val blkNo)
   delete $ from (table @Tx) >>= \ tx -> where_ (tx ^. TxBlockNo >. val blkNo)
+  delete $ from (table @TxIn) >>= \ txi -> where_ (txi ^. TxInBlockNo >. val blkNo)
+  delete $ from (table @TxOut) >>= \ txo -> where_ (txo ^. TxOutBlockNo >. val blkNo)
 
+  transactionCommit
   pure $ isNonZero count
 
 -- | Delete a block if it exists. Returns 'True' if it did exist and has been

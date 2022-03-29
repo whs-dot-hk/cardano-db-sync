@@ -104,4 +104,4 @@ testSlotLeader =
 mkTxOut :: Word64 -> TxId -> TxOut
 mkTxOut blkNo txId =
   let addr = mkAddressHash blkNo txId in
-  TxOut txId 0 (Text.pack addr) (BS.pack addr) False Nothing Nothing (DbLovelace 1000000000) Nothing
+  TxOut txId 0 (Text.pack addr) (BS.pack addr) False Nothing Nothing (DbLovelace 1000000000) Nothing blkNo
