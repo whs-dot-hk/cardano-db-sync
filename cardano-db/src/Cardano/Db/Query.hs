@@ -19,6 +19,7 @@ module Cardano.Db.Query
   , queryMainBlock
   , queryBlockTxCount
   , queryBlocksAfterSlot
+  , queryByronGenesisSupply
   , queryCalcEpochEntry
   , queryCheckPoints
   , queryCurrentEpochNo
@@ -32,7 +33,6 @@ module Cardano.Db.Query
   , queryRewardsSpend
   , queryFeesUpToBlockNo
   , queryFeesUpToSlotNo
-  , queryGenesisSupply
   , queryShelleyGenesisSupply
   , queryLatestBlock
   , queryLatestCachedEpochNo
@@ -280,6 +280,20 @@ queryBlocksAfterSlot slotNo = do
     pure countRows
   pure $ maybe 0 unValue (listToMaybe res)
 
+-- | Return the total Genesis coin supply.
+queryByronGenesisSupply :: MonadIO m => ReaderT SqlBackend m Ada
+queryByronGenesisSupply = do
+    res <- select $ do
+            (_tx :& txOut :& blk) <-
+                from $ table @Tx
+                `innerJoin` table @TxOut
+                `on` (\(tx :& txOut) -> tx ^. TxId ==. txOut ^. TxOutTxId)
+                `innerJoin` table @Block
+                `on` (\(tx :& _txOut :& blk) -> just (tx ^. TxBlockNo) ==. blk ^. BlockBlockNo)
+            where_ (isNothing $ blk ^. BlockEpochNo)
+            pure $ sum_ (txOut ^. TxOutValue)
+    pure $ unValueSumAda (listToMaybe res)
+
 -- | Calculate the Epoch table entry for the specified epoch.
 -- When syncing the chain or filling an empty table, this is called at each epoch boundary to
 -- calculate the Epcoh entry for the last epoch.
@@ -464,20 +478,6 @@ queryFeesUpToSlotNo slotNo = do
     where_ (blk ^. BlockSlotNo <=. just (val slotNo))
     pure $ sum_ (tx ^. TxFee)
   pure $ unValueSumAda (listToMaybe res)
-
--- | Return the total Genesis coin supply.
-queryGenesisSupply :: MonadIO m => ReaderT SqlBackend m Ada
-queryGenesisSupply = do
-    res <- select $ do
-            (_tx :& txOut :& blk) <-
-                from $ table @Tx
-                `innerJoin` table @TxOut
-                `on` (\(tx :& txOut) -> tx ^. TxId ==. txOut ^. TxOutTxId)
-                `innerJoin` table @Block
-                `on` (\(tx :& _txOut :& blk) -> just (tx ^. TxBlockNo) ==. blk ^. BlockBlockNo)
-            where_ (isNothing $ blk ^. BlockEpochNo)
-            pure $ sum_ (txOut ^. TxOutValue)
-    pure $ unValueSumAda (listToMaybe res)
 
 -- | Return the total Shelley Genesis coin supply. The Shelley Genesis Block
 -- is the unique which has a non-null PreviousId, but has null Epoch.

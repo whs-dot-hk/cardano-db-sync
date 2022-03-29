@@ -51,7 +51,7 @@ genTestParameters = do
     Just latest ->
       TestParams
           <$> randomRIO (1, latest - 1)
-          <*> runDbNoLoggingEnv queryGenesisSupply
+          <*> runDbNoLoggingEnv queryByronGenesisSupply
 
 
 queryInitialSupply :: Word64 -> IO Accounting
