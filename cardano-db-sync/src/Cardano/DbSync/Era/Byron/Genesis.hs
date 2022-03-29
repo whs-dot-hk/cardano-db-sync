@@ -114,6 +114,10 @@ validateGenesisDistribution
     -> ReaderT SqlBackend m (Either SyncNodeError ())
 validateGenesisDistribution tracer networkName cfg bid =
   runExceptT $ do
+
+    liftIO $ logInfo tracer ("validateGenesisDistribution :: " <> textShow bid)
+
+
     meta <- liftLookupFail "validateGenesisDistribution" DB.queryMeta
 
     when (DB.metaStartTime meta /= Byron.configStartTime cfg) $
