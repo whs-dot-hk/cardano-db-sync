@@ -52,6 +52,7 @@ module Cardano.Db.Query
   , querySlotUtcTime
   , queryTotalSupply
   , queryTxCount
+  , queryTxCountByBlockNo
   , queryTxId
   , queryTxInCount
   , queryTxOutCount
@@ -284,13 +285,11 @@ queryBlocksAfterSlot slotNo = do
 queryByronGenesisSupply :: MonadIO m => ReaderT SqlBackend m Ada
 queryByronGenesisSupply = do
     res <- select $ do
-            (_tx :& txOut :& blk) <-
+            (tx :& txOut) <-
                 from $ table @Tx
                 `innerJoin` table @TxOut
                 `on` (\(tx :& txOut) -> tx ^. TxId ==. txOut ^. TxOutTxId)
-                `innerJoin` table @Block
-                `on` (\(tx :& _txOut :& blk) -> just (tx ^. TxBlockNo) ==. blk ^. BlockBlockNo)
-            where_ (isNothing $ blk ^. BlockEpochNo)
+            where_ (tx ^. TxBlockNo ==. val 0)
             pure $ sum_ (txOut ^. TxOutValue)
     pure $ unValueSumAda (listToMaybe res)
 
@@ -671,6 +670,14 @@ queryTxCount = do
   res <- select $ do
     _ <- from $ table @Tx
     pure countRows
+  pure $ maybe 0 unValue (listToMaybe res)
+
+queryTxCountByBlockNo :: MonadIO m => BlockNo -> ReaderT SqlBackend m Word
+queryTxCountByBlockNo (BlockNo blkNo) = do
+  res <- select $ do
+            tx <- from $ table @Tx
+            where_ (tx ^. TxBlockNo ==. val blkNo)
+            pure countRows
   pure $ maybe 0 unValue (listToMaybe res)
 
 -- | Get the 'TxId' associated with the given hash.

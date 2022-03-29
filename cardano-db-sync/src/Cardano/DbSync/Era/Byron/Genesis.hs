@@ -112,12 +112,8 @@ validateGenesisDistribution
     :: (MonadBaseControl IO m, MonadIO m)
     => Trace IO Text -> Text -> Byron.Config -> DB.BlockId
     -> ReaderT SqlBackend m (Either SyncNodeError ())
-validateGenesisDistribution tracer networkName cfg bid =
+validateGenesisDistribution tracer networkName cfg _bid =
   runExceptT $ do
-
-    liftIO $ logInfo tracer ("validateGenesisDistribution :: " <> textShow bid)
-
-
     meta <- liftLookupFail "validateGenesisDistribution" DB.queryMeta
 
     when (DB.metaStartTime meta /= Byron.configStartTime cfg) $
@@ -135,7 +131,7 @@ validateGenesisDistribution tracer networkName cfg bid =
               , DB.metaNetworkName meta
               ]
 
-    txCount <- lift $ DB.queryBlockTxCount bid
+    txCount <- lift $ DB.queryTxCountByBlockNo (BlockNo 0)
     let expectedTxCount = fromIntegral $length (genesisTxos cfg)
     when (txCount /= expectedTxCount) $
       dbSyncNodeError $ Text.concat
@@ -144,7 +140,8 @@ validateGenesisDistribution tracer networkName cfg bid =
               , " but got "
               , textShow txCount
               ]
-    totalSupply <- lift DB.queryGenesisSupply
+
+    totalSupply <- lift DB.queryByronGenesisSupply
     case DB.word64ToAda <$> configGenesisSupply cfg of
       Left err -> dbSyncNodeError $ "validateGenesisDistribution: " <> textShow err
       Right expectedSupply ->

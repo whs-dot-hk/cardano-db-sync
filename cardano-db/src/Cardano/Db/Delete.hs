@@ -14,7 +14,7 @@ import           Control.Monad.IO.Class (MonadIO)
 import           Control.Monad.Trans.Reader (ReaderT)
 
 import           Database.Esqueleto.Experimental (delete, deleteCount, from, just, table, val,
-                   where_, (==.), (>=.), (^.))
+                   where_, (==.), (>.), (^.))
 
 import           Database.Persist.Sql (SqlBackend)
 
@@ -33,12 +33,12 @@ deleteAfterBlockNo :: MonadIO m => BlockNo -> ReaderT SqlBackend m Bool
 deleteAfterBlockNo (BlockNo blkNo) = do
   count <- deleteCount $ do
             blk <- from $ table @Block
-            where_ (blk ^. BlockBlockNo >=. just (val blkNo))
+            where_ (blk ^. BlockBlockNo >. just (val blkNo))
 
-  delete $ from (table @Delegation) >>= \ d -> where_ (d ^. DelegationBlockNo >=. val blkNo)
-  delete $ from (table @StakeDeregistration) >>= \ sd -> where_ (sd ^. StakeDeregistrationBlockNo >=. val blkNo)
-  delete $ from (table @StakeRegistration) >>= \ sr -> where_ (sr ^. StakeRegistrationBlockNo >=. val blkNo)
-  delete $ from (table @Tx) >>= \ tx -> where_ (tx ^. TxBlockNo >=. val blkNo)
+  delete $ from (table @Delegation) >>= \ d -> where_ (d ^. DelegationBlockNo >. val blkNo)
+  delete $ from (table @StakeDeregistration) >>= \ sd -> where_ (sd ^. StakeDeregistrationBlockNo >. val blkNo)
+  delete $ from (table @StakeRegistration) >>= \ sr -> where_ (sr ^. StakeRegistrationBlockNo >. val blkNo)
+  delete $ from (table @Tx) >>= \ tx -> where_ (tx ^. TxBlockNo >. val blkNo)
 
   pure $ isNonZero count
 
