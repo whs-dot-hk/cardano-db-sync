@@ -123,7 +123,7 @@ insertEpoch :: (MonadBaseControl IO m, MonadIO m) => Epoch -> ReaderT SqlBackend
 insertEpoch = insertUnchecked "Epoch"
 
 insertEpochParam :: (MonadBaseControl IO m, MonadIO m) => EpochParam -> ReaderT SqlBackend m EpochParamId
-insertEpochParam = insertUnchecked "EpochParam"
+insertEpochParam = insertCheckUnique "EpochParam"
 
 insertEpochRewardTotalReceived :: (MonadBaseControl IO m, MonadIO m) => EpochRewardTotalReceived -> ReaderT SqlBackend m EpochRewardTotalReceivedId
 insertEpochRewardTotalReceived = insertCheckUnique "EpochRewardTotalReceived"
