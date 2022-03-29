@@ -8,6 +8,7 @@
 module Cardano.Db.Insert
   ( insertAdaPots
   , insertBlock
+  , insertBlockChecked
   , insertCollateralTxIn
   , insertDelegation
   , insertEpoch
@@ -54,7 +55,6 @@ module Cardano.Db.Insert
   , insertDelistedPool
 
   -- Export mainly for testing.
-  , insertBlockChecked
   , insertCheckUnique
   , insertManyUncheckedUnique
   , insertUnchecked

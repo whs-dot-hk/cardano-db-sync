@@ -63,7 +63,7 @@ rollbackToPoint backend trce point =
     queryBlockNo :: MonadIO m => Point CardanoBlock -> ReaderT SqlBackend m (Either DB.LookupFail BlockNo)
     queryBlockNo pnt =
       case getPoint pnt of
-        Origin -> panic "rollbackToPoint: At Origin"
+        Origin -> pure $ Right 0
         At blk -> DB.queryBlockHash (SBS.fromShort . getOneEraHash $ blockPointHash blk)
 
 -- For testing and debugging.

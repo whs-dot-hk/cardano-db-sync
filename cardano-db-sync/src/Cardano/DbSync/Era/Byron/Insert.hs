@@ -35,6 +35,7 @@ import           Cardano.DbSync.Era.Util (liftLookupFail)
 
 import           Cardano.DbSync.Types
 
+import           Cardano.Slotting.Block (BlockNo (..))
 import           Cardano.Slotting.Slot (EpochNo (..), EpochSize (..))
 
 import qualified Data.ByteString.Char8 as BS
@@ -84,7 +85,7 @@ insertABOBBoundary tracer blk details = do
                     , DB.slotLeaderPoolHashId = Nothing
                     , DB.slotLeaderDescription = "Epoch boundary slot leader"
                     }
-  void . lift . DB.insertBlock $
+  void . lift . DB.insertBlockChecked $
             DB.Block
               { DB.blockHash = Byron.unHeaderHash $ Byron.boundaryHashAnnotated blk
               , DB.blockEpochNo = Just $ unEpochNo (sdEpochNo details)
@@ -139,7 +140,7 @@ insertABlock tracer firstBlockOfEpoch blk details = do
                     , DB.blockOpCertCounter = Nothing
                     }
 
-    zipWithM_ (insertTx tracer blkNo) (Byron.blockPayload blk) [ 0 .. ]
+    zipWithM_ (insertTx tracer (BlockNo blkNo)) (Byron.blockPayload blk) [ 0 .. ]
 
     liftIO $ do
       let epoch = unEpochNo (sdEpochNo details)
@@ -170,7 +171,7 @@ insertABlock tracer firstBlockOfEpoch blk details = do
 
 insertTx
     :: (MonadBaseControl IO m, MonadIO m)
-    => Trace IO Text -> Word64 -> Byron.TxAux -> Word64
+    => Trace IO Text -> BlockNo -> Byron.TxAux -> Word64
     -> ExceptT SyncNodeError (ReaderT SqlBackend m) ()
 insertTx tracer blkNo tx blockIndex = do
     resolvedInputs <- mapM resolveTxInputs (toList $ Byron.txInputs (Byron.taTx tx))
@@ -178,7 +179,7 @@ insertTx tracer blkNo tx blockIndex = do
     txId <- lift . DB.insertTx $
               DB.Tx
                 { DB.txHash = Byron.unTxHash $ Crypto.serializeCborHash (Byron.taTx tx)
-                , DB.txBlockNo = blkNo
+                , DB.txBlockNo = unBlockNo blkNo
                 , DB.txBlockIndex = blockIndex
                 , DB.txOutSum = vfValue valFee
                 , DB.txFee = vfFee valFee
@@ -194,8 +195,8 @@ insertTx tracer blkNo tx blockIndex = do
 
     -- Insert outputs for a transaction before inputs in case the inputs for this transaction
     -- references the output (not sure this can even happen).
-    lift $ zipWithM_ (insertTxOut tracer txId) [0 ..] (toList . Byron.txOutputs $ Byron.taTx tx)
-    mapMVExceptT (insertTxIn tracer txId) resolvedInputs
+    lift $ zipWithM_ (insertTxOut tracer blkNo txId) [0 ..] (toList . Byron.txOutputs $ Byron.taTx tx)
+    mapMVExceptT (insertTxIn tracer blkNo txId) resolvedInputs
   where
     annotateTx :: SyncNodeError -> SyncNodeError
     annotateTx ee =
@@ -205,9 +206,9 @@ insertTx tracer blkNo tx blockIndex = do
 
 insertTxOut
     :: (MonadBaseControl IO m, MonadIO m)
-    => Trace IO Text -> DB.TxId -> Word32 -> Byron.TxOut
+    => Trace IO Text -> BlockNo -> DB.TxId -> Word32 -> Byron.TxOut
     -> ReaderT SqlBackend m ()
-insertTxOut _tracer txId index txout =
+insertTxOut _tracer blkNo txId index txout =
   void . DB.insertTxOut $
             DB.TxOut
               { DB.txOutTxId = txId
@@ -219,27 +220,29 @@ insertTxOut _tracer txId index txout =
               , DB.txOutStakeAddressId = Nothing -- Byron does not have a stake address.
               , DB.txOutValue = DbLovelace (Byron.unsafeGetLovelace $ Byron.txOutValue txout)
               , DB.txOutDataHash = Nothing
+              , DB.txOutBlockNo = unBlockNo blkNo
               }
 
 
 insertTxIn
     :: (MonadBaseControl IO m, MonadIO m)
-    => Trace IO Text -> DB.TxId -> (Byron.TxIn, DB.TxId, DbLovelace)
+    => Trace IO Text -> BlockNo -> DB.TxId -> (Byron.TxIn, DB.TxId, DbLovelace)
     -> ExceptT SyncNodeError (ReaderT SqlBackend m) ()
-insertTxIn _tracer txInId (Byron.TxInUtxo _txHash inIndex, txOutId, _lovelace) = do
+insertTxIn _tracer blkNo txInId (Byron.TxInUtxo _txHash inIndex, txOutId, _lovelace) = do
   void . lift . DB.insertTxIn $
             DB.TxIn
               { DB.txInTxInId = txInId
               , DB.txInTxOutId = txOutId
               , DB.txInTxOutIndex = fromIntegral inIndex
               , DB.txInRedeemerId = Nothing
+              , DB.txInBlockNo = unBlockNo blkNo
               }
 
 -- -----------------------------------------------------------------------------
 
 resolveTxInputs :: MonadIO m => Byron.TxIn -> ExceptT SyncNodeError (ReaderT SqlBackend m) (Byron.TxIn, DB.TxId, DbLovelace)
 resolveTxInputs txIn@(Byron.TxInUtxo txHash index) = do
-    res <- liftLookupFail "resolveInput" $ DB.queryTxOutValue (Byron.unTxHash txHash, fromIntegral index)
+    res <- liftLookupFail "resolveInput " $ DB.queryTxOutValue (Byron.unTxHash txHash, fromIntegral index)
     pure $ convert res
   where
     convert :: (DB.TxId, DbLovelace) -> (Byron.TxIn, DB.TxId, DbLovelace)

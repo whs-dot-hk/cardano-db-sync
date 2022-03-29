@@ -133,6 +133,7 @@ share
     stakeAddressId      StakeAddressId Maybe
     value               DbLovelace          sqltype=lovelace
     dataHash            ByteString Maybe    sqltype=hash32type
+    blockNo             Word64              sqltype=word63type
     UniqueTxout         txId index          -- The (tx_id, index) pair must be unique.
 
   TxIn
@@ -140,12 +141,14 @@ share
     txOutId             TxId
     txOutIndex          Word16              sqltype=txindex
     redeemerId          RedeemerId Maybe
+    blockNo             Word64              sqltype=word63type
     UniqueTxin          txOutId txOutIndex
 
   CollateralTxIn
     txInId              TxId
     txOutId             TxId
     txOutIndex          Word16              sqltype=txindex
+    blockNo             Word64              sqltype=word63type
     UniqueColTxin       txInId txOutId txOutIndex
 
   -- A table containing metadata about the chain. There will probably only ever be one

@@ -187,6 +187,7 @@ insertTxOuts (BlockNo blkNo) (address, value) = do
               , DB.txOutStakeAddressId = Nothing
               , DB.txOutValue = DB.DbLovelace (Byron.unsafeGetLovelace value)
               , DB.txOutDataHash = Nothing
+              , DB.txOutBlockNo = blkNo
               }
 
 -- -----------------------------------------------------------------------------

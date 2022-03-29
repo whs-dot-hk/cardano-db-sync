@@ -217,37 +217,38 @@ insertTx tracer network lStateSnap blkNo epochNo slotNo blockIndex tx grouped = 
                 , DB.txScriptSize = sum $ Generic.txScriptSizes tx
                 }
 
-    if not (Generic.txValidContract tx) then do
-      let txIns = map (prepareTxIn txId []) resolvedInputs
-      pure $ grouped <> BlockGroupedData txIns []
+    if not (Generic.txValidContract tx)
+      then do
+        let txIns = map (prepareTxIn blkNo txId []) resolvedInputs
+        pure $ grouped <> BlockGroupedData txIns []
 
-    else do
-      -- The following operations only happen if the script passes stage 2 validation (or the tx has
-      -- no script).
-      txOutsGrouped <- mapM (prepareTxOut tracer blkNo (txId, txHash)) (Generic.txOutputs tx)
+      else do
+        -- The following operations only happen if the script passes stage 2 validation (or the tx has
+        -- no script).
+        txOutsGrouped <- mapM (prepareTxOut tracer blkNo (txId, txHash)) (Generic.txOutputs tx)
 
-      redeemers <- mapM (insertRedeemer tracer (fst <$> groupedTxOut grouped) txId) (Generic.txRedeemer tx)
+        redeemers <- mapM (insertRedeemer tracer (fst <$> groupedTxOut grouped) txId) (Generic.txRedeemer tx)
 
-      mapM_ (insertDatum tracer txId) (Generic.txData tx)
-      -- Insert the transaction inputs and collateral inputs (Alonzo).
-      let txIns = map (prepareTxIn txId redeemers) resolvedInputs
-      mapM_ (insertCollateralTxIn tracer txId) (Generic.txCollateralInputs tx)
+        mapM_ (insertDatum tracer txId) (Generic.txData tx)
+        -- Insert the transaction inputs and collateral inputs (Alonzo).
+        let txIns = map (prepareTxIn blkNo txId redeemers) resolvedInputs
+        mapM_ (insertCollateralTxIn tracer blkNo txId) (Generic.txCollateralInputs tx)
 
-      whenJust (maybeToStrict $ Generic.txMetadata tx) $ \ md ->
-        insertTxMetadata tracer txId md
+        whenJust (maybeToStrict $ Generic.txMetadata tx) $ \ md ->
+          insertTxMetadata tracer txId md
 
-      mapM_ (insertCertificate tracer lStateSnap network blkNo txId epochNo slotNo redeemers) $ Generic.txCertificates tx
-      mapM_ (insertWithdrawals tracer txId redeemers) $ Generic.txWithdrawals tx
+        mapM_ (insertCertificate tracer lStateSnap network blkNo txId epochNo slotNo redeemers) $ Generic.txCertificates tx
+        mapM_ (insertWithdrawals tracer txId redeemers) $ Generic.txWithdrawals tx
 
-      mapM_ (insertParamProposal tracer blkNo) $ Generic.txParamProposal tx
+        mapM_ (insertParamProposal tracer blkNo) $ Generic.txParamProposal tx
 
-      insertMaTxMint tracer txId $ Generic.txMint tx
+        insertMaTxMint tracer txId $ Generic.txMint tx
 
-      mapM_ (insertScript tracer txId) $ Generic.txScripts tx
+        mapM_ (insertScript tracer txId) $ Generic.txScripts tx
 
-      mapM_ (insertExtraKeyWitness tracer txId) $ Generic.txExtraKeyWitnesses tx
+        mapM_ (insertExtraKeyWitness tracer txId) $ Generic.txExtraKeyWitnesses tx
 
-      pure $ grouped <> BlockGroupedData txIns txOutsGrouped
+        pure $ grouped <> BlockGroupedData txIns txOutsGrouped
 
 prepareTxOut
     :: (MonadBaseControl IO m, MonadIO m)
@@ -265,6 +266,7 @@ prepareTxOut tracer blkNo (txId, txHash) (Generic.TxOut index addr addrRaw value
                   , DB.txOutStakeAddressId = mSaId
                   , DB.txOutValue = Generic.coinToDbLovelace value
                   , DB.txOutDataHash = dataHash
+                  , DB.txOutBlockNo = unBlockNo blkNo
                   }
     let eutxo = ExtendedTxOut txHash txOut
     maTxOuts <- prepareMaTxOuts tracer maMap
@@ -274,15 +276,16 @@ prepareTxOut tracer blkNo (txId, txHash) (Generic.TxOut index addr addrRaw value
     hasScript = maybe False Generic.hasCredScript (Generic.getPaymentCred addr)
 
 prepareTxIn
-    :: DB.TxId -> [(DB.RedeemerId, Generic.TxRedeemer)]
+    :: BlockNo -> DB.TxId -> [(DB.RedeemerId, Generic.TxRedeemer)]
     -> (Generic.TxIn, DB.TxId, DbLovelace)
     -> DB.TxIn
-prepareTxIn txInId redeemers (Generic.TxIn _txHash index txInRedeemerIndex, txOutId, _lovelace) =
+prepareTxIn blkNo txInId redeemers (Generic.TxIn _txHash index txInRedeemerIndex, txOutId, _lovelace) =
     DB.TxIn
         { DB.txInTxInId = txInId
         , DB.txInTxOutId = txOutId
         , DB.txInTxOutIndex = fromIntegral index
         , DB.txInRedeemerId = fst <$> find redeemerMatches redeemers
+        , DB.txInBlockNo = unBlockNo blkNo
         }
   where
     redeemerMatches :: (DB.RedeemerId, Generic.TxRedeemer) -> Bool
@@ -292,15 +295,16 @@ prepareTxIn txInId redeemers (Generic.TxIn _txHash index txInRedeemerIndex, txOu
 
 insertCollateralTxIn
     :: (MonadBaseControl IO m, MonadIO m)
-    => Trace IO Text -> DB.TxId -> Generic.TxIn
+    => Trace IO Text -> BlockNo -> DB.TxId -> Generic.TxIn
     -> ExceptT SyncNodeError (ReaderT SqlBackend m) ()
-insertCollateralTxIn _tracer txInId (Generic.TxIn txId index _) = do
+insertCollateralTxIn _tracer blkNo txInId (Generic.TxIn txId index _) = do
   txOutId <- liftLookupFail "insertCollateralTxIn" $ DB.queryTxId txId
   void . lift . DB.insertCollateralTxIn $
             DB.CollateralTxIn
               { DB.collateralTxInTxInId = txInId
               , DB.collateralTxInTxOutId = txOutId
               , DB.collateralTxInTxOutIndex = fromIntegral index
+              , DB.collateralTxInBlockNo = unBlockNo blkNo
               }
 
 insertCertificate
