@@ -315,7 +315,7 @@ insertCertificate
     -> ExceptT SyncNodeError (ReaderT SqlBackend m) ()
 insertCertificate tracer lStateSnap network blkNo txId epochNo slotNo redeemers (Generic.TxCertificate ridx idx cert) =
   case cert of
-    Shelley.DCertDeleg deleg -> insertDelegCert tracer network blkNo idx ridx epochNo slotNo redeemers deleg
+    Shelley.DCertDeleg deleg -> insertDelegCert tracer network blkNo txId idx ridx epochNo slotNo redeemers deleg
     Shelley.DCertPool pool -> insertPoolCert tracer lStateSnap network epochNo blkNo txId idx pool
     Shelley.DCertMir mir -> insertMirCert tracer network blkNo idx mir
     Shelley.DCertGenesis _gen -> do
@@ -335,14 +335,14 @@ insertPoolCert tracer lStateSnap network epoch blkNo txId idx pCert =
 
 insertDelegCert
     :: (MonadBaseControl IO m, MonadIO m)
-    => Trace IO Text -> Ledger.Network -> BlockNo -> Word16 -> Maybe Word64 -> EpochNo -> SlotNo
+    => Trace IO Text -> Ledger.Network -> BlockNo -> DB.TxId -> Word16 -> Maybe Word64 -> EpochNo -> SlotNo
     -> [(DB.RedeemerId, Generic.TxRedeemer)]
     -> Shelley.DelegCert StandardCrypto
     -> ExceptT SyncNodeError (ReaderT SqlBackend m) ()
-insertDelegCert tracer network blkNo idx ridx epochNo slotNo redeemers dCert =
+insertDelegCert tracer network blkNo txId idx ridx epochNo slotNo redeemers dCert =
   case dCert of
-    Shelley.RegKey cred -> insertStakeRegistration tracer epochNo blkNo idx $ Generic.annotateStakingCred network cred
-    Shelley.DeRegKey cred -> insertStakeDeregistration tracer network epochNo blkNo idx ridx redeemers cred
+    Shelley.RegKey cred -> insertStakeRegistration tracer epochNo blkNo txId idx $ Generic.annotateStakingCred network cred
+    Shelley.DeRegKey cred -> insertStakeDeregistration tracer network epochNo blkNo txId idx ridx redeemers cred
     Shelley.Delegate (Shelley.Delegation cred poolkh) -> insertDelegation tracer network epochNo slotNo blkNo idx ridx cred redeemers poolkh
 
 insertPoolRegister
@@ -488,9 +488,9 @@ insertPoolOwner network poolUpdateId blkNo skh = do
 
 insertStakeRegistration
     :: (MonadBaseControl IO m, MonadIO m)
-    => Trace IO Text -> EpochNo -> BlockNo -> Word16 -> Shelley.RewardAcnt StandardCrypto
+    => Trace IO Text -> EpochNo -> BlockNo -> DB.TxId -> Word16 -> Shelley.RewardAcnt StandardCrypto
     -> ExceptT SyncNodeError (ReaderT SqlBackend m) ()
-insertStakeRegistration _tracer epochNo blkNo idx rewardAccount = do
+insertStakeRegistration _tracer epochNo blkNo txId idx rewardAccount = do
   saId <- lift $ insertStakeAddress blkNo rewardAccount
   void . lift . DB.insertStakeRegistration $
     DB.StakeRegistration
@@ -498,20 +498,22 @@ insertStakeRegistration _tracer epochNo blkNo idx rewardAccount = do
       , DB.stakeRegistrationCertIndex = idx
       , DB.stakeRegistrationEpochNo = unEpochNo epochNo
       , DB.stakeRegistrationBlockNo = unBlockNo blkNo
+      , DB.stakeRegistrationTxId = txId
       }
 
 insertStakeDeregistration
     :: (MonadBaseControl IO m, MonadIO m)
-    => Trace IO Text -> Ledger.Network -> EpochNo -> BlockNo -> Word16 -> Maybe Word64
+    => Trace IO Text -> Ledger.Network -> EpochNo -> BlockNo -> DB.TxId -> Word16 -> Maybe Word64
     -> [(DB.RedeemerId, Generic.TxRedeemer)] -> Ledger.StakeCredential StandardCrypto
     -> ExceptT SyncNodeError (ReaderT SqlBackend m) ()
-insertStakeDeregistration _tracer network epochNo (BlockNo blkNo) idx ridx redeemers cred = do
+insertStakeDeregistration _tracer network epochNo (BlockNo blkNo) txId idx ridx redeemers cred = do
     scId <- liftLookupFail "insertStakeDeregistration" $ queryStakeAddress (Generic.stakingCredHash network cred)
     void . lift . DB.insertStakeDeregistration $
       DB.StakeDeregistration
         { DB.stakeDeregistrationAddrId = scId
         , DB.stakeDeregistrationCertIndex = idx
         , DB.stakeDeregistrationEpochNo = unEpochNo epochNo
+        , DB.stakeDeregistrationTxId = txId
         , DB.stakeDeregistrationBlockNo = blkNo
         , DB.stakeDeregistrationRedeemerId = fst <$> find redeemerMatches redeemers
         }

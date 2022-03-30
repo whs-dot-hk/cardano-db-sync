@@ -251,19 +251,21 @@ share
   -- When was a staking key/script registered
   StakeRegistration
     addrId              StakeAddressId
+    txId                TxId
     certIndex           Word16
     epochNo             Word64              sqltype=word31type
-    blockNo             Word64              sqltype=word63type
-    UniqueStakeRegistration blockNo certIndex
+    blockNo             Word64              sqltype=word63type   -- For rollbacks.
+    UniqueStakeRegistration txId certIndex
 
   -- When was a staking key/script deregistered
   StakeDeregistration
     addrId              StakeAddressId
+    txId                TxId
     certIndex           Word16
     epochNo             Word64              sqltype=word31type
-    blockNo             Word64              sqltype=word63type
+    blockNo             Word64              sqltype=word63type  -- For rollbanks.
     redeemerId          RedeemerId Maybe
-    UniqueStakeDeregistration blockNo certIndex
+    UniqueStakeDeregistration txId certIndex
 
   Delegation
     addrId              StakeAddressId
