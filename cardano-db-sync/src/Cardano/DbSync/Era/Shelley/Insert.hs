@@ -238,7 +238,7 @@ insertTx tracer network lStateSnap blkNo epochNo slotNo blockIndex tx grouped = 
           insertTxMetadata tracer txId md
 
         mapM_ (insertCertificate tracer lStateSnap network blkNo txId epochNo slotNo redeemers) $ Generic.txCertificates tx
-        mapM_ (insertWithdrawals tracer txId redeemers) $ Generic.txWithdrawals tx
+        mapM_ (insertWithdrawals tracer blkNo txId redeemers) $ Generic.txWithdrawals tx
 
         mapM_ (insertParamProposal tracer blkNo) $ Generic.txParamProposal tx
 
@@ -608,10 +608,10 @@ insertMirCert _tracer network blkNo idx mcert = do
 
 insertWithdrawals
     :: (MonadBaseControl IO m, MonadIO m)
-    => Trace IO Text -> DB.TxId -> [(DB.RedeemerId, Generic.TxRedeemer)]
+    => Trace IO Text -> BlockNo -> DB.TxId -> [(DB.RedeemerId, Generic.TxRedeemer)]
     -> Generic.TxWithdrawal
     -> ExceptT SyncNodeError (ReaderT SqlBackend m) ()
-insertWithdrawals _tracer txId redeemers (Generic.TxWithdrawal index account coin) = do
+insertWithdrawals _tracer (BlockNo blkNo) txId redeemers (Generic.TxWithdrawal index account coin) = do
     addrId <- liftLookupFail "insertWithdrawals" $ queryStakeAddress (Ledger.serialiseRewardAcnt account)
     void . lift . DB.insertWithdrawal $
       DB.Withdrawal
@@ -619,6 +619,7 @@ insertWithdrawals _tracer txId redeemers (Generic.TxWithdrawal index account coi
         , DB.withdrawalTxId = txId
         , DB.withdrawalAmount = Generic.coinToDbLovelace coin
         , DB.withdrawalRedeemerId = fst <$> find redeemerMatches redeemers
+        , DB.withdrawalBlockNo = blkNo
         }
   where
     redeemerMatches :: (DB.RedeemerId, Generic.TxRedeemer) -> Bool

@@ -38,11 +38,14 @@ deleteAfterBlockNo (BlockNo blkNo) = do
 
   delete $ from (table @CollateralTxIn) >>= \cti -> where_ (cti ^. CollateralTxInBlockNo >. val blkNo)
   delete $ from (table @Delegation) >>= \ d -> where_ (d ^. DelegationBlockNo >. val blkNo)
+  delete $ from (table @ParamProposal) >>= \ pp -> where_ (pp ^. ParamProposalBlockNo >. val blkNo)
+  delete $ from (table @Reserve) >>= \ r -> where_ (r ^. ReserveBlockNo >. val blkNo)
   delete $ from (table @StakeDeregistration) >>= \ sd -> where_ (sd ^. StakeDeregistrationBlockNo >. val blkNo)
   delete $ from (table @StakeRegistration) >>= \ sr -> where_ (sr ^. StakeRegistrationBlockNo >. val blkNo)
   delete $ from (table @Tx) >>= \ tx -> where_ (tx ^. TxBlockNo >. val blkNo)
   delete $ from (table @TxIn) >>= \ txi -> where_ (txi ^. TxInBlockNo >. val blkNo)
   delete $ from (table @TxOut) >>= \ txo -> where_ (txo ^. TxOutBlockNo >. val blkNo)
+  delete $ from (table @Withdrawal) >>= \ w -> where_ (w ^. WithdrawalBlockNo >. val blkNo)
 
   transactionCommit
   pure $ isNonZero count

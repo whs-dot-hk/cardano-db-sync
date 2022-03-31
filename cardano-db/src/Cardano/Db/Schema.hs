@@ -309,6 +309,7 @@ share
     amount              DbLovelace          sqltype=lovelace
     redeemerId          RedeemerId Maybe
     txId                TxId
+    blockNo             Word64              sqltype=word63type
     UniqueWithdrawal    addrId txId
 
   -- This table should never get rolled back.
