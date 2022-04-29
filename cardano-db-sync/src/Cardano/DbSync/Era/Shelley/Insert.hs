@@ -471,7 +471,7 @@ insertStakeAddressRefIfMissing
     :: (MonadBaseControl IO m, MonadIO m)
     => Trace IO Text -> Cache -> DB.TxId -> Ledger.Addr StandardCrypto
     -> ReaderT SqlBackend m (Maybe DB.StakeAddressId)
-insertStakeAddressRefIfMissing trce cache txId addr =
+insertStakeAddressRefIfMissing _trce cache txId addr =
     maybe insertSAR (pure . Just) =<< queryStakeAddressRef
   where
     insertSAR :: (MonadBaseControl IO m, MonadIO m) => ReaderT SqlBackend m (Maybe DB.StakeAddressId)
@@ -480,13 +480,8 @@ insertStakeAddressRefIfMissing trce cache txId addr =
         Ledger.AddrBootstrap {} -> pure Nothing
         Ledger.Addr nw _pcred sref ->
           case sref of
-            Ledger.StakeRefBase cred ->
-              Just <$> insertStakeAddress txId (Shelley.RewardAcnt nw cred)
-            Ledger.StakeRefPtr ptr -> do
-              mid <- queryStakeRefPtr ptr
-              when (isNothing mid) .
-                liftIO . logWarning trce $ "insertStakeRefIfMissing: query of " <> textShow ptr <> " returns Nothing"
-              pure mid
+            Ledger.StakeRefBase cred -> Just <$> insertStakeAddress txId (Shelley.RewardAcnt nw cred)
+            Ledger.StakeRefPtr ptr -> queryStakeRefPtr ptr
             Ledger.StakeRefNull -> pure Nothing
 
     queryStakeAddressRef
