@@ -1,6 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -49,8 +50,9 @@ ledgerAddrBalance addr lsc =
       LedgerStateAllegra st -> getShelleyBalance addr $ getUTxO st
       LedgerStateMary st -> getShelleyBalance addr $ getUTxO st
       LedgerStateAlonzo st -> getAlonzoBalance addr $ getUTxO st
+      LedgerStateBabbage _st -> panic "undefined Babbage ledgerAddrBalance"
   where
-    getUTxO :: LedgerState (ShelleyBlock era) -> Shelley.UTxO era
+    getUTxO :: LedgerState (ShelleyBlock p era) -> Shelley.UTxO era
     getUTxO = Shelley._utxo . Shelley.lsUTxOState . Shelley.esLState . Shelley.nesEs . shelleyLedgerState
 
 getByronBalance :: Text -> Byron.UTxO -> Either Text Word64

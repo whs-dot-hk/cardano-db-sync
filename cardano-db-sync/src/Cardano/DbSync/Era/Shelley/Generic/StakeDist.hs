@@ -82,10 +82,11 @@ getStakeSlice pInfo network epoch sliceIndex minSliceSize els =
     LedgerStateAllegra als -> genericStakeSlice pInfo network epoch sliceIndex minSliceSize als
     LedgerStateMary mls -> genericStakeSlice pInfo network epoch sliceIndex minSliceSize mls
     LedgerStateAlonzo als -> genericStakeSlice pInfo network epoch sliceIndex minSliceSize als
+    LedgerStateBabbage bls -> genericStakeSlice pInfo network epoch sliceIndex minSliceSize bls
 
-genericStakeSlice :: forall era c blk. (c ~ Crypto era, ConsensusProtocol (BlockProtocol blk))
+genericStakeSlice :: forall era c blk p. (c ~ Crypto era, ConsensusProtocol (BlockProtocol blk))
                   => ProtocolInfo IO blk -> Ledger.Network -> EpochNo -> Word64 -> Word64
-                  -> LedgerState (ShelleyBlock era) -> StakeSliceRes
+                  -> LedgerState (ShelleyBlock p era) -> StakeSliceRes
 genericStakeSlice pInfo network epoch sliceIndex minSliceSize lstate
     | index > delegationsLen = NoSlices
     | index == delegationsLen = Slice (emptySlice epoch) True

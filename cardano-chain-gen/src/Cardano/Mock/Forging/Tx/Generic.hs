@@ -51,8 +51,8 @@ import qualified Cardano.Crypto.Hash as Hash
 import           Cardano.Mock.Forging.Tx.Alonzo.ScriptsExamples
 import           Cardano.Mock.Forging.Types
 
-resolveAddress :: forall era. (Crypto era ~ StandardCrypto, HasField "address" (Core.TxOut era) (Addr (Crypto era)))
-               => UTxOIndex era -> LedgerState (ShelleyBlock era)
+resolveAddress :: forall era p. (Crypto era ~ StandardCrypto, HasField "address" (Core.TxOut era) (Addr (Crypto era)))
+               => UTxOIndex era -> LedgerState (ShelleyBlock p era)
                -> Either ForgingError (Addr (Crypto era))
 resolveAddress index st = case index of
     UTxOAddressNew n -> Right $ Addr Testnet (unregisteredAddresses !! n) StakeRefNull
@@ -64,8 +64,8 @@ resolveAddress index st = case index of
       Right $ Addr Testnet (unregisteredAddresses !! n) (StakeRefPtr ptr)
     _ -> getField @"address" . snd . fst <$> resolveUTxOIndex index st
 
-resolveUTxOIndex :: forall era. (Crypto era ~ StandardCrypto, HasField "address" (Core.TxOut era) (Addr (Crypto era)))
-                 => UTxOIndex era -> LedgerState (ShelleyBlock era)
+resolveUTxOIndex :: forall era p. (Crypto era ~ StandardCrypto, HasField "address" (Core.TxOut era) (Addr (Crypto era)))
+                 => UTxOIndex era -> LedgerState (ShelleyBlock p era)
                  -> Either ForgingError ((TxIn (Crypto era), Core.TxOut era), UTxOIndex era)
 resolveUTxOIndex index st = toLeft $ case index of
     UTxOIndex n -> utxoPairs !? n
@@ -94,7 +94,7 @@ resolveUTxOIndex index st = toLeft $ case index of
     toLeft (Just  (txIn, txOut)) = Right ((txIn, txOut), UTxOInput txIn)
 
 resolveStakeCreds :: (Crypto era ~ StandardCrypto)
-                  => StakeIndex -> LedgerState (ShelleyBlock era)
+                  => StakeIndex -> LedgerState (ShelleyBlock p era)
                   -> Either ForgingError (StakeCredential StandardCrypto)
 resolveStakeCreds indx st = case indx of
     StakeIndex n -> toEither $ fst <$> (rewardAccs !? n)
@@ -130,7 +130,7 @@ resolveStakeCreds indx st = case indx of
     toEither (Just a) = Right a
 
 resolvePool :: (Crypto era ~ StandardCrypto)
-            => PoolIndex -> LedgerState (ShelleyBlock era)
+            => PoolIndex -> LedgerState (ShelleyBlock p era)
             -> KeyHash 'StakePool StandardCrypto
 resolvePool pix st = case pix of
     PoolIndexId key -> key
@@ -140,7 +140,7 @@ resolvePool pix st = case pix of
     poolParams = Map.elems $ _pParams $ dpsPState $ lsDPState $ esLState $
         nesEs $ Consensus.shelleyLedgerState st
 
-allPoolStakeCert :: LedgerState (ShelleyBlock era) -> [DCert (Crypto era)]
+allPoolStakeCert :: LedgerState (ShelleyBlock p era) -> [DCert (Crypto era)]
 allPoolStakeCert st =
     DCertDeleg . RegKey <$> nub creds
   where
