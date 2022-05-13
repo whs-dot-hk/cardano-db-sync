@@ -34,10 +34,12 @@ import           Ouroboros.Network.Point
 -- rolling back to.
 rollbackToPoint :: SyncEnv -> CardanoPoint -> IO (Either SyncNodeError ())
 rollbackToPoint env point =
-    DB.runDbIohkNoLogging backend $ runExceptT action
+    DB.runDbIohkNoLogging (envBackend env) $ runExceptT action
   where
-    backend = envBackend env
+    trce :: Trace IO Text
     trce = getTrace env
+
+    cache :: Cache
     cache = envCache env
 
     action :: MonadIO m => ExceptT SyncNodeError (ReaderT SqlBackend m) ()
@@ -54,12 +56,12 @@ rollbackToPoint env point =
                 ]
         -- We delete the block right after the point we rollback to. This delete
         -- should cascade to the rest of the chain.
-        (prevId, mBlockNo) <- liftLookupFail "Rollback.rollbackToPoint" $ queryBlock point
+        blkNo <- liftLookupFail "Rollback.rollbackToPoint" $ queryBlockNo point
         -- 'length xs' here gives an approximation of the blocks deleted. An approximation
         -- is good enough, since it is only used to decide on the best policy and is not
         -- important for correctness.
-        lift $ rollbackCache cache mBlockNo (fromIntegral $ length xs)
-        deleted <- lift $ DB.deleteCascadeAfter prevId
+        lift $ rollbackCache cache blkNo (fromIntegral $ length xs)
+        deleted <- lift $ DB.deleteAfterBlockNo blkNo
         liftIO . logInfo trce $
                     if deleted
                       then "Blocks deleted"
@@ -71,14 +73,11 @@ rollbackToPoint env point =
         Origin -> DB.querySlotNos
         At sl -> DB.querySlotNosGreaterThan (unSlotNo sl)
 
-    queryBlock :: MonadIO m => Point CardanoBlock
-               -> ReaderT SqlBackend m (Either DB.LookupFail (DB.BlockId, Maybe Word64))
-    queryBlock pnt = do
+    queryBlockNo :: MonadIO m => Point CardanoBlock -> ReaderT SqlBackend m (Either DB.LookupFail BlockNo)
+    queryBlockNo pnt =
       case getPoint pnt of
-        Origin ->
-          fmap (, Nothing) <$> DB.queryGenesis
-        At blkPoint ->
-          DB.queryBlockNoId (SBS.fromShort . getOneEraHash $ blockPointHash blkPoint)
+        Origin -> pure $ Right 0
+        At blk -> DB.queryBlockHash (SBS.fromShort . getOneEraHash $ blockPointHash blk)
 
 -- For testing and debugging.
 unsafeRollback :: Trace IO Text -> DB.PGConfig -> SlotNo -> IO (Either SyncNodeError ())

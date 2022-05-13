@@ -11,6 +11,7 @@
 module Cardano.DbSync.LedgerEvent
   ( LedgerEvent (..)
   , convertAuxLedgerEvent
+  , ledgerEventName
   ) where
 
 import           Cardano.Db hiding (EpochNo, epochNo)
@@ -75,6 +76,18 @@ toOrdering ev = case ev of
   LedgerTotalRewards {} -> 5
   LedgerStartAtEpoch {} -> 6
   LedgerNewEpoch {} -> 7
+
+ledgerEventName :: LedgerEvent -> Text
+ledgerEventName le =
+  case le of
+    LedgerMirDist {} -> "LedgerMirDist"
+    LedgerPoolReap {} -> "LedgerPoolReap"
+    LedgerIncrementalRewards {} -> "LedgerIncrementalRewards"
+    LedgerDeltaRewards {} -> "LedgerDeltaRewards"
+    LedgerRestrainedRewards {} -> "LedgerRestrainedRewards"
+    LedgerTotalRewards {} -> "LedgerTotalRewards"
+    LedgerStartAtEpoch {} -> "LedgerStartAtEpoch"
+    LedgerNewEpoch {} -> "LedgerNewEpoch"
 
 convertAuxLedgerEvent :: Network -> OneEraLedgerEvent (CardanoEras StandardCrypto) -> Maybe LedgerEvent
 convertAuxLedgerEvent nw = toLedgerEvent nw . wrappedAuxLedgerEvent

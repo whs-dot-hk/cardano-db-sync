@@ -69,26 +69,26 @@ mkFingerPrint :: FilePath -> FilePath
 mkFingerPrint testLabel = fingerprintRoot </> testLabel
 
 data Config = Config
-    { topLevelConfig :: TopLevelConfig CardanoBlock
-    , protocolInfo :: Consensus.ProtocolInfo IO CardanoBlock
-    , protocolInfoForging :: Consensus.ProtocolInfo IO CardanoBlock
-    , syncNodeParams :: SyncNodeParams
-    }
+  { topLevelConfig :: TopLevelConfig CardanoBlock
+  , protocolInfo :: Consensus.ProtocolInfo IO CardanoBlock
+  , protocolInfoForging :: Consensus.ProtocolInfo IO CardanoBlock
+  , syncNodeParams :: SyncNodeParams
+  }
 
 data DBSyncEnv = DBSyncEnv
-    { dbSyncParams :: SyncNodeParams
-    , dbSyncForkDB :: IO (Async ())
-    , dbSyncThreadVar :: TMVar (Async ())
-    }
+  { dbSyncParams :: SyncNodeParams
+  , dbSyncForkDB :: IO (Async ())
+  , dbSyncThreadVar :: TMVar (Async ())
+  }
 
 mkDBSyncEnv :: SyncNodeParams -> IO () -> IO DBSyncEnv
 mkDBSyncEnv params runDBSync = do
   runningVar <- newEmptyTMVarIO
   pure $ DBSyncEnv
-    { dbSyncParams = params
-    , dbSyncForkDB = async runDBSync
-    , dbSyncThreadVar = runningVar
-    }
+          { dbSyncParams = params
+          , dbSyncForkDB = async runDBSync
+          , dbSyncThreadVar = runningVar
+          }
 
 stopDBSync :: DBSyncEnv -> IO ()
 stopDBSync env = do
@@ -98,7 +98,7 @@ stopDBSync env = do
     Just a -> do
       cancel a
       -- make it empty
-      _ <- atomically $ takeTMVar (dbSyncThreadVar env)
+      void . atomically $ takeTMVar (dbSyncThreadVar env)
       pure ()
 
 stopDBSyncIfRunning :: DBSyncEnv -> IO ()
@@ -114,13 +114,13 @@ stopDBSyncIfRunning env = do
 
 startDBSync :: DBSyncEnv -> IO ()
 startDBSync env = do
-    thr <- atomically $ tryReadTMVar $ dbSyncThreadVar env
-    case thr of
-      Just _a -> error "db-sync already running"
-      Nothing -> do
-        a <- dbSyncForkDB env
-        _ <- atomically $ tryPutTMVar (dbSyncThreadVar env) a
-        pure ()
+  thr <- atomically $ tryReadTMVar (dbSyncThreadVar env)
+  case thr of
+    Just _a -> error "db-sync already running"
+    Nothing -> do
+      a <- dbSyncForkDB env
+      void . atomically $ tryPutTMVar (dbSyncThreadVar env) a
+      pure ()
 
 pollDBSync :: DBSyncEnv -> IO (Maybe (Either SomeException ()))
 pollDBSync env = do
@@ -130,7 +130,7 @@ pollDBSync env = do
     Just a -> poll a
 
 withDBSyncEnv :: IO DBSyncEnv -> (DBSyncEnv -> IO a) -> IO a
-withDBSyncEnv mkEnv action = do
+withDBSyncEnv mkEnv action =
   bracket mkEnv stopDBSyncIfRunning action
 
 getDBSyncPGPass :: DBSyncEnv -> Db.PGPassSource
@@ -149,19 +149,19 @@ getPoolLayer env = do
 
 setupTestsDir :: FilePath -> IO ()
 setupTestsDir dir = do
-    eitherM (panic . textShow) pure $ runExceptT $
-      CLI.runGenesisCmd $ GenesisCreateStaked
-        (CLI.GenesisDir dir) 3 3 3 3 Nothing (Just 3000000) 3000000 (Testnet $ NetworkMagic 42) 1 3 0
+  eitherM (panic . textShow) pure $ runExceptT $
+    CLI.runGenesisCmd $ GenesisCreateStaked
+      (CLI.GenesisDir dir) 3 3 3 3 Nothing (Just 3000000) 3000000 (Testnet $ NetworkMagic 42) 1 3 0
 
 mkConfig :: FilePath -> FilePath -> IO Config
 mkConfig staticDir mutableDir = do
-    config <- readSyncNodeConfig $ ConfigFile ( staticDir </> "test-db-sync-config.json")
-    genCfg <- either (error . Text.unpack . renderSyncNodeError) id <$> runExceptT (readCardanoGenesisConfig config)
-    let pInfoDbSync = mkProtocolInfoCardano genCfg []
-    creds <- mkShelleyCredentials $ staticDir </> "pools" </> "bulk1.creds"
-    let pInfoForger = mkProtocolInfoCardano genCfg creds
-    syncPars <- mkSyncNodeParams staticDir mutableDir
-    pure $ Config (Consensus.pInfoConfig pInfoDbSync) pInfoDbSync pInfoForger syncPars
+  config <- readSyncNodeConfig $ ConfigFile ( staticDir </> "test-db-sync-config.json")
+  genCfg <- either (error . Text.unpack . renderSyncNodeError) id <$> runExceptT (readCardanoGenesisConfig config)
+  let pInfoDbSync = mkProtocolInfoCardano genCfg []
+  creds <- mkShelleyCredentials $ staticDir </> "pools" </> "bulk1.creds"
+  let pInfoForger = mkProtocolInfoCardano genCfg creds
+  syncPars <- mkSyncNodeParams staticDir mutableDir
+  pure $ Config (Consensus.pInfoConfig pInfoDbSync) pInfoDbSync pInfoForger syncPars
 
 mkShelleyCredentials :: FilePath -> IO [TPraosLeaderCredentials StandardCrypto]
 mkShelleyCredentials bulkFile = do
@@ -191,16 +191,18 @@ mkSyncNodeParams staticDir mutableDir = do
     }
 
 emptyMetricsSetters :: MetricSetters
-emptyMetricsSetters = MetricSetters
-  { metricsSetNodeBlockHeight = \_ -> pure ()
-  , metricsSetDbQueueLength = \_ -> pure ()
-  , metricsSetDbBlockHeight = \_ -> pure ()
-  , metricsSetDbSlotHeight = \_ -> pure ()
-  }
+emptyMetricsSetters =
+  MetricSetters
+    { metricsSetNodeBlockHeight = \_ -> pure ()
+    , metricsSetDbQueueLength = \_ -> pure ()
+    , metricsSetDbBlockHeight = \_ -> pure ()
+    , metricsSetDbSlotHeight = \_ -> pure ()
+    }
 
-withFullConfig :: FilePath -> FilePath
-               -> (Interpreter -> ServerHandle IO CardanoBlock -> DBSyncEnv -> IO ())
-               -> IOManager -> [(Text, Text)] -> IO ()
+withFullConfig
+    :: FilePath -> FilePath
+    -> (Interpreter -> ServerHandle IO CardanoBlock -> DBSyncEnv -> IO ())
+    -> IOManager -> [(Text, Text)] -> IO ()
 withFullConfig config testLabel action iom migr = do
     recreateDir mutableDir
     cfg <- mkConfig configDir mutableDir
@@ -219,7 +221,7 @@ withFullConfig config testLabel action iom migr = do
         $ \mockServer ->
           -- we dont fork dbsync here. Just prepare it as an action
           withDBSyncEnv (mkDBSyncEnv dbsyncParams dbsyncRun) $ \dbSync -> do
-            _ <- hSilence [stderr] $ Db.recreateDB (getDBSyncPGPass dbSync)
+            void . hSilence [stderr] $ Db.recreateDB (getDBSyncPGPass dbSync)
             action interpreter mockServer dbSync
   where
     configDir = mkConfigDir config

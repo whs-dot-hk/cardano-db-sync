@@ -166,7 +166,10 @@ data CardanoLedgerState = CardanoLedgerState
 
 -- The height of the block in the current Epoch. We maintain this
 -- data next to the ledger state and store it in the same blob file.
-data EpochBlockNo = GenesisEpochBlockNo | EBBEpochBlockNo | EpochBlockNo Word64
+data EpochBlockNo
+  = GenesisEpochBlockNo
+  | EBBEpochBlockNo
+  | EpochBlockNo !Word64
 
 instance ToCBOR EpochBlockNo where
   toCBOR GenesisEpochBlockNo = toCBOR (0 :: Word8)
@@ -183,9 +186,9 @@ instance FromCBOR EpochBlockNo where
       2 -> EpochBlockNo <$> fromCBOR
       n -> fail $ "unexpected EpochBlockNo value " <> show n
 
-encodeCardanoLedgerState :: (ExtLedgerState CardanoBlock -> Encoding)
-                         -> CardanoLedgerState -> Encoding
-encodeCardanoLedgerState encodeExt cls = mconcat
+encodeCardanoLedgerState :: (ExtLedgerState CardanoBlock -> Encoding) -> CardanoLedgerState -> Encoding
+encodeCardanoLedgerState encodeExt cls =
+  mconcat
     [ encodeExt (clsState cls)
     , toCBOR (clsEpochBlockNo cls)
     ]
@@ -279,10 +282,11 @@ mkLedgerEnv trce protocolInfo dir nw stableEpochSlot systemStart aop = do
 
 
 initCardanoLedgerState :: Consensus.ProtocolInfo IO CardanoBlock -> CardanoLedgerState
-initCardanoLedgerState pInfo = CardanoLedgerState
-      { clsState = Consensus.pInfoInitLedger pInfo
-      , clsEpochBlockNo = GenesisEpochBlockNo
-      }
+initCardanoLedgerState pInfo =
+  CardanoLedgerState
+    { clsState = Consensus.pInfoInitLedger pInfo
+    , clsEpochBlockNo = GenesisEpochBlockNo
+    }
 
 -- TODO make this type safe. We make the assumption here that the first message of
 -- the chainsync protocol is 'RollbackTo'.
@@ -358,15 +362,12 @@ applyBlock env blk = do
     stakeSliceMinSize = 2000
 
     stakeSlice :: CardanoLedgerState -> SlotDetails -> Generic.StakeSliceRes
-    stakeSlice cls details = case clsEpochBlockNo cls of
-      EpochBlockNo n -> Generic.getStakeSlice
-                          (leProtocolInfo env)
-                          (leNetwork env)
-                          (sdEpochNo details)
-                          n
-                          stakeSliceMinSize
-                          (clsState cls)
-      _ -> Generic.NoSlices
+    stakeSlice cls details =
+      case clsEpochBlockNo cls of
+        EpochBlockNo n ->
+          Generic.getStakeSlice (leProtocolInfo env) (leNetwork env) (sdEpochNo details) n
+            stakeSliceMinSize (clsState cls)
+        _ -> Generic.NoSlices
 
 generateEvents :: LedgerEnv -> LedgerEventState -> SlotDetails -> STM [LedgerEvent]
 generateEvents env oldEventState details = do

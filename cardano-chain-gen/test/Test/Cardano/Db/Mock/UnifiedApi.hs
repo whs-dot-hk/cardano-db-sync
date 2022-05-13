@@ -41,9 +41,9 @@ forgeNextAndSubmit inter mockServer testBlock = do
 
 forgeNextFindLeaderAndSubmit :: Interpreter -> ServerHandle IO CardanoBlock -> [TxEra] -> IO CardanoBlock
 forgeNextFindLeaderAndSubmit interpreter mockServer txs'  = do
-    blk <- forgeNextFindLeader interpreter txs'
-    atomically $ addBlock mockServer blk
-    pure blk
+  blk <- forgeNextFindLeader interpreter txs'
+  atomically $ addBlock mockServer blk
+  pure blk
 
 forgeNextSkipSlotsFindLeaderAndSubmit :: Interpreter -> ServerHandle IO CardanoBlock -> Word64 -> [TxEra] -> IO CardanoBlock
 forgeNextSkipSlotsFindLeaderAndSubmit interpreter mockServer skipSlots txs'  = do
@@ -52,12 +52,13 @@ forgeNextSkipSlotsFindLeaderAndSubmit interpreter mockServer skipSlots txs'  = d
     pure blk
 
 forgeAndSubmitBlocks :: Interpreter -> ServerHandle IO CardanoBlock -> Int -> IO [CardanoBlock]
-forgeAndSubmitBlocks interpreter mockServer blocksToCreate = do
+forgeAndSubmitBlocks interpreter mockServer blocksToCreate =
     forM [1..blocksToCreate] $ \_ -> forgeNextFindLeaderAndSubmit interpreter mockServer []
 
 withAlonzoFindLeaderAndSubmit
     :: Interpreter -> ServerHandle IO CardanoBlock
-    -> (LedgerState (ShelleyBlock (AlonzoEra StandardCrypto)) -> Either ForgingError [Core.Tx (AlonzoEra StandardCrypto)])
+    -> (LedgerState (ShelleyBlock (AlonzoEra StandardCrypto))
+    -> Either ForgingError [Core.Tx (AlonzoEra StandardCrypto)])
     -> IO CardanoBlock
 withAlonzoFindLeaderAndSubmit interpreter mockServer mkTxs = do
     alTxs <- withAlonzoLedgerState interpreter mkTxs
@@ -65,7 +66,8 @@ withAlonzoFindLeaderAndSubmit interpreter mockServer mkTxs = do
 
 withAlonzoFindLeaderAndSubmitTx
     :: Interpreter -> ServerHandle IO CardanoBlock
-    -> (LedgerState (ShelleyBlock (AlonzoEra StandardCrypto)) -> Either ForgingError (Core.Tx (AlonzoEra StandardCrypto)))
+    -> (LedgerState (ShelleyBlock (AlonzoEra StandardCrypto))
+    -> Either ForgingError (Core.Tx (AlonzoEra StandardCrypto)))
     -> IO CardanoBlock
 withAlonzoFindLeaderAndSubmitTx interpreter mockServer mkTxs = do
     withAlonzoFindLeaderAndSubmit interpreter mockServer $ \st -> do
@@ -74,7 +76,8 @@ withAlonzoFindLeaderAndSubmitTx interpreter mockServer mkTxs = do
 
 withShelleyFindLeaderAndSubmit
     :: Interpreter -> ServerHandle IO CardanoBlock
-    -> (LedgerState (ShelleyBlock (ShelleyEra StandardCrypto)) -> Either ForgingError [Core.Tx (ShelleyEra StandardCrypto)])
+    -> (LedgerState (ShelleyBlock (ShelleyEra StandardCrypto))
+    -> Either ForgingError [Core.Tx (ShelleyEra StandardCrypto)])
     -> IO CardanoBlock
 withShelleyFindLeaderAndSubmit interpreter mockServer mkTxs = do
     alTxs <- withShelleyLedgerState interpreter mkTxs
@@ -82,56 +85,57 @@ withShelleyFindLeaderAndSubmit interpreter mockServer mkTxs = do
 
 withShelleyFindLeaderAndSubmitTx
     :: Interpreter -> ServerHandle IO CardanoBlock
-    -> (LedgerState (ShelleyBlock (ShelleyEra StandardCrypto)) -> Either ForgingError (Core.Tx (ShelleyEra StandardCrypto)))
+    -> (LedgerState (ShelleyBlock (ShelleyEra StandardCrypto))
+    -> Either ForgingError (Core.Tx (ShelleyEra StandardCrypto)))
     -> IO CardanoBlock
-withShelleyFindLeaderAndSubmitTx interpreter mockServer mkTxs = do
-    withShelleyFindLeaderAndSubmit interpreter mockServer $ \st -> do
-        tx <- mkTxs st
-        pure [tx]
+withShelleyFindLeaderAndSubmitTx interpreter mockServer mkTxs =
+  withShelleyFindLeaderAndSubmit interpreter mockServer $ \st -> do
+    tx <- mkTxs st
+    pure [tx]
 
 getAlonzoLedgerState :: Interpreter -> IO (LedgerState (ShelleyBlock (AlonzoEra StandardCrypto)))
 getAlonzoLedgerState interpreter = withAlonzoLedgerState interpreter Right
 
 skipUntilNextEpoch :: Interpreter -> ServerHandle IO CardanoBlock -> [TxEra] -> IO CardanoBlock
 skipUntilNextEpoch interpreter mockServer txsEra = do
-    slot <- getCurrentSlot interpreter
-    let skipSlots = 500 - mod (unSlotNo slot) 500
-    blk <- forgeNextAfter interpreter skipSlots txsEra
-    atomically $ addBlock mockServer blk
-    pure blk
+  slot <- getCurrentSlot interpreter
+  let skipSlots = 500 - mod (unSlotNo slot) 500
+  blk <- forgeNextAfter interpreter skipSlots txsEra
+  atomically $ addBlock mockServer blk
+  pure blk
 
 -- First block of next epoch is also submited
 fillUntilNextEpoch :: Interpreter -> ServerHandle IO CardanoBlock -> IO [CardanoBlock]
 fillUntilNextEpoch interpreter mockServer = do
-    startingEpochNo <- getCurrentEpoch interpreter
-    let
-      go n blks = do
-        blk <- forgeNextFindLeader interpreter []
-        atomically $ addBlock mockServer blk
-        epochNo' <- getCurrentEpoch interpreter
-        if epochNo' == startingEpochNo
+  startingEpochNo <- getCurrentEpoch interpreter
+  let
+    go :: Int -> [CardanoBlock] -> IO [CardanoBlock]
+    go n blks = do
+      blk <- forgeNextFindLeader interpreter []
+      atomically $ addBlock mockServer blk
+      epochNo' <- getCurrentEpoch interpreter
+      if epochNo' == startingEpochNo
         then go (n + 1) (blk : blks)
         else pure $ reverse (blk : blks)
-    go (0 :: Int) []
+  go (0 :: Int) []
 
 -- | Returns number of blocks submitted
 fillEpochs :: Interpreter -> ServerHandle IO CardanoBlock -> Int -> IO [CardanoBlock]
-fillEpochs interpreter mockServer epochs = do
-    blks <- replicateM epochs $ fillUntilNextEpoch interpreter mockServer
-    pure $ concat blks
+fillEpochs interpreter mockServer epochs =
+  concat <$> replicateM epochs (fillUntilNextEpoch interpreter mockServer)
 
 -- | Providing 30 in percentage will create blocks that approximately fill 30% of epoch.
 -- Returns number of blocks submitted
 fillEpochPercentage :: Interpreter -> ServerHandle IO CardanoBlock -> Int -> IO [CardanoBlock]
 fillEpochPercentage interpreter mockServer percentage = do
-    let blocksToCreate = div (percentage * blocksPerEpoch) 100
-    replicateM blocksToCreate $forgeNextFindLeaderAndSubmit interpreter mockServer []
+  let blocksToCreate = div (percentage * blocksPerEpoch) 100
+  replicateM blocksToCreate $forgeNextFindLeaderAndSubmit interpreter mockServer []
 
 registerAllStakeCreds :: Interpreter -> ServerHandle IO CardanoBlock -> IO CardanoBlock
 registerAllStakeCreds interpreter mockServer = do
-    blk <- forgeWithStakeCreds interpreter
-    atomically $ addBlock mockServer blk
-    pure blk
+  blk <- forgeWithStakeCreds interpreter
+  atomically $ addBlock mockServer blk
+  pure blk
 
 -- Expected number. This should be taken from the parameters, instead of hardcoded.
 blocksPerEpoch :: Int
