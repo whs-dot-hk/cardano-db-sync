@@ -206,7 +206,7 @@ withFullConfig config testLabel action iom migr = do
     fingerFile <- prepareFingerprintFile testLabel
     let dbsyncParams = syncNodeParams cfg
     -- Set to True to disable logging, False to enable it.
-    trce <- if True
+    trce <- if False
               then pure nullTracer
               else configureLogging dbsyncParams "db-sync-node"
     let dbsyncRun = runDbSync emptyMetricsSetters migr iom trce dbsyncParams True 35 35
